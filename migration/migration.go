@@ -103,7 +103,7 @@ func (m *Migration) scanSource(rootPath string, callback func(currentPath string
 
 // migrate is helper function to execute migration by name
 func (m *Migration) migrate(filename string) error {
-	migrationPath := fmt.Sprintf("%s/migration/sql/%s", getCurrentPath(), filename)
+	migrationPath := fmt.Sprintf("%s/sql/%s", getCurrentPath(), filename)
 	query, err := openSource(migrationPath)
 	if err != nil {
 		return err
