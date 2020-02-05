@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dhanarJkusuma/guardian/auth/password"
-	"github.com/dhanarJkusuma/guardian/auth/token"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +12,8 @@ import (
 	"github.com/go-redis/redis"
 
 	"github.com/dhanarJkusuma/guardian/schema"
+	"github.com/dhanarJkusuma/guardian/auth/password"
+	"github.com/dhanarJkusuma/guardian/auth/token"
 )
 
 var (

@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
-
-	"github.com/dhanarJkusuma/guardian"
 )
 
 // User represents `rbac_user` table in the database
@@ -34,7 +32,7 @@ const insertUserQuery = `
 // CreateUser function will create a new record of user entity
 func (u *User) CreateUser() error {
 	if u.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	result, err := u.DBContract.Exec(
 		insertUserQuery,
@@ -54,7 +52,7 @@ func (u *User) CreateUser() error {
 // CreateUserWithContext function will create a new record of user entity with specific context
 func (u *User) CreateUserContext(ctx context.Context) error {
 	if u.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	result, err := u.DBContract.ExecContext(
@@ -87,7 +85,7 @@ const saveUserQuery = `
 // otherwise it will create a new one
 func (u *User) Save() error {
 	if u.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	result, err := u.DBContract.Exec(
@@ -114,7 +112,7 @@ func (u *User) Save() error {
 // otherwise it will create a new one
 func (u *User) SaveContext(ctx context.Context) error {
 	if u.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	result, err := u.DBContract.ExecContext(
 		ctx,
@@ -142,7 +140,7 @@ const deleteUserQuery = `DELETE FROM rbac_user WHERE id = ?`
 // if user has no ID, than error will be returned
 func (u *User) Delete() error {
 	if u.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	if u.ID <= 0 {
@@ -163,7 +161,7 @@ func (u *User) Delete() error {
 // if user has no ID, than error will be returned
 func (u *User) DeleteContext(ctx context.Context) error {
 	if u.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	if u.ID <= 0 {
@@ -196,7 +194,7 @@ const getAccessQuery = `
 // This function will check the user permission record
 func (u *User) CanAccess(method, path string) (bool, error) {
 	if u.DBContract == nil {
-		return false, guardian.ErrNoSchema
+		return false, ErrNoSchema
 	}
 
 	var accessRecord existRecord
@@ -212,7 +210,7 @@ func (u *User) CanAccess(method, path string) (bool, error) {
 // This function will check the user permission record with specific context
 func (u *User) CanAccessContext(ctx context.Context, method, path string) (bool, error) {
 	if u.DBContract == nil {
-		return false, guardian.ErrNoSchema
+		return false, ErrNoSchema
 	}
 
 	var accessRecord existRecord
@@ -240,7 +238,7 @@ const getUserPermissionQuery = `
 // This function will check the user permission record by user and permissionName
 func (u *User) HasPermission(permissionName string) (bool, error) {
 	if u.DBContract == nil {
-		return false, guardian.ErrNoSchema
+		return false, ErrNoSchema
 	}
 
 	var permissionRecord existRecord
@@ -256,7 +254,7 @@ func (u *User) HasPermission(permissionName string) (bool, error) {
 // This function will check the user permission record by user, permissionName and context
 func (u *User) HasPermissionContext(ctx context.Context, permissionName string) (bool, error) {
 	if u.DBContract == nil {
-		return false, guardian.ErrNoSchema
+		return false, ErrNoSchema
 	}
 
 	var permissionRecord existRecord
@@ -282,7 +280,7 @@ const getUserRoleQuery = `
 // This function will check the user role record by user and roleName
 func (u *User) HasRole(roleName string) (bool, error) {
 	if u.DBContract == nil {
-		return false, guardian.ErrNoSchema
+		return false, ErrNoSchema
 	}
 
 	var roleRecord existRecord
@@ -298,7 +296,7 @@ func (u *User) HasRole(roleName string) (bool, error) {
 // This function will check the user role record by user, roleName and context
 func (u *User) HasRoleContext(ctx context.Context, roleName string) (bool, error) {
 	if u.DBContract == nil {
-		return false, guardian.ErrNoSchema
+		return false, ErrNoSchema
 	}
 	var roleRecord existRecord
 	result := u.DBContract.QueryRowContext(ctx, getUserRoleQuery, u.ID, roleName)
@@ -325,7 +323,7 @@ const getUserRolesQuery = `
 // This function will check the user role record by this specific userID
 func (u *User) GetRoles() ([]Role, error) {
 	if u.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 	var roles []Role
 
@@ -354,7 +352,7 @@ func (u *User) GetRoles() ([]Role, error) {
 // This function will check the user role record by this specific userID and context
 func (u *User) GetRolesContext(ctx context.Context) ([]Role, error) {
 	if u.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 	var roles []Role
 
@@ -396,7 +394,7 @@ const getUserPermissionsQuery = `
 // This function will check the user permission record by specific userID
 func (u *User) GetPermissions() ([]Permission, error) {
 	if u.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	permissions := make([]Permission, 0)
@@ -433,7 +431,7 @@ func (u *User) GetPermissions() ([]Permission, error) {
 // This function will check the user permission record by this specific userID
 func (u *User) GetPermissionsContext(ctx context.Context) ([]Permission, error) {
 	if u.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	permissions := make([]Permission, 0)
@@ -484,7 +482,7 @@ const fetchUserByUsernameOrEmail = `
 // This function will select data from user record by username or email column
 func (u *User) FindUserByUsernameOrEmail(params string) (*User, error) {
 	if u.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var user = new(User)
@@ -512,7 +510,7 @@ func (u *User) FindUserByUsernameOrEmail(params string) (*User, error) {
 // This function will select data from user record by username or email column with specific context
 func (u *User) FindUserByUsernameOrEmailContext(ctx context.Context, params string) (*User, error) {
 	if u.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var user = new(User)
@@ -552,14 +550,14 @@ const fetchDynamicUserParams = `
 // This function will select data from user record by given parameters
 func (u *User) FindUser(params map[string]interface{}) (*User, error) {
 	if u.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var user = new(User)
 	var result *sql.Row
 	paramsLength := len(params)
 	if paramsLength == 0 {
-		return nil, guardian.ErrInvalidParams
+		return nil, ErrInvalidParams
 	}
 
 	query := fetchDynamicUserParams
@@ -598,14 +596,14 @@ func (u *User) FindUser(params map[string]interface{}) (*User, error) {
 // This function will select data from user record by given parameters with specific context
 func (u *User) FindUserContext(ctx context.Context, params map[string]interface{}) (*User, error) {
 	if u.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var user = new(User)
 	var result *sql.Row
 	paramsLength := len(params)
 	if paramsLength == 0 {
-		return nil, guardian.ErrInvalidParams
+		return nil, ErrInvalidParams
 	}
 
 	query := fetchDynamicUserParams

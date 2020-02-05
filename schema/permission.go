@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"time"
-
-	"github.com/dhanarJkusuma/guardian"
 )
 
 // Permission represents `rbac_permission` table in the database
@@ -34,7 +32,7 @@ const insertPermissionQuery = `
 // CreatePermission function will create a new record of permission entity
 func (p *Permission) CreatePermission() error {
 	if p.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	result, err := p.DBContract.Exec(
 		insertPermissionQuery,
@@ -53,7 +51,7 @@ func (p *Permission) CreatePermission() error {
 // CreatePermissionContext function will create a new record of permission entity with specific context
 func (p *Permission) CreatePermissionContext(ctx context.Context) error {
 	if p.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	result, err := p.DBContract.ExecContext(
 		ctx,
@@ -86,7 +84,7 @@ const savePermissionQuery = `
 // otherwise it will create a new one
 func (p *Permission) Save() error {
 	if p.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	result, err := p.DBContract.Exec(
@@ -113,7 +111,7 @@ func (p *Permission) Save() error {
 // otherwise it will create a new one
 func (p *Permission) SaveContext(ctx context.Context) error {
 	if p.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	result, err := p.DBContract.ExecContext(
@@ -142,7 +140,7 @@ const deletePermissionQuery = `DELETE FROM rbac_permission WHERE id = ?`
 // if permission has no ID, than error will be returned
 func (p *Permission) Delete() error {
 	if p.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	if p.ID <= 0 {
 		return ErrInvalidID
@@ -162,7 +160,7 @@ func (p *Permission) Delete() error {
 // if permission has no ID, than error will be returned
 func (p *Permission) DeleteContext(ctx context.Context) error {
 	if p.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	if p.ID <= 0 {
 		return ErrInvalidID
@@ -195,7 +193,7 @@ const fetchPermissionQuery = `
 // This function will fetch the data from database and search by this name
 func (p *Permission) GetPermission(name string) (*Permission, error) {
 	if p.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var permission = new(Permission)
@@ -223,7 +221,7 @@ func (p *Permission) GetPermission(name string) (*Permission, error) {
 // This function will fetch the data from database and search by this name
 func (p *Permission) GetPermissionContext(ctx context.Context, name string) (*Permission, error) {
 	if p.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var permission = new(Permission)
@@ -263,7 +261,7 @@ const fetchPermissionByResourceQuery = `
 // This function will fetch the data from database and search by method and path
 func (p *Permission) GetPermissionByResource(method, path string) (*Permission, error) {
 	if p.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var permission = new(Permission)
@@ -291,7 +289,7 @@ func (p *Permission) GetPermissionByResource(method, path string) (*Permission, 
 // This function will fetch the data from database and search by method and path
 func (p *Permission) GetPermissionByResourceContext(ctx context.Context, method, path string) (*Permission, error) {
 	if p.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var permission = new(Permission)

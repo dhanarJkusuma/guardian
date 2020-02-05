@@ -2,7 +2,6 @@ package schema
 
 import (
 	"database/sql"
-	"github.com/dhanarJkusuma/guardian"
 )
 
 // MigrationSchema represents `rbac_migration` table in the database
@@ -19,7 +18,7 @@ const fetchMigrationQuery = `
 // CheckExistingMigration will check existing migration data by key
 func (m *MigrationSchema) CheckExistingMigration(key string) (bool, error) {
 	if m.DBContract == nil {
-		return false, guardian.ErrNoSchema
+		return false, ErrNoSchema
 	}
 
 	var migrationRecord existRecord
@@ -43,7 +42,7 @@ const insertMigrationQuery = `
 // WriteMigration will create migration record with specific key
 func (m *MigrationSchema) WriteMigration(key string) error {
 	if m.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	_, err := m.DBContract.Exec(

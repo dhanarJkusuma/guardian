@@ -3,15 +3,17 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/dhanarJkusuma/guardian"
-	"github.com/dhanarJkusuma/guardian/auth"
+	"time"
+
 	"github.com/go-redis/redis"
 	_ "github.com/go-sql-driver/mysql"
-	"time"
+
+	"github.com/dhanarJkusuma/guardian"
+	"github.com/dhanarJkusuma/guardian/auth"
 )
 
 func main() {
-	dbConn := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&multiStatements=true", "root", "", "127.0.0.1", "auth")
+	dbConn := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&multiStatements=true", "root", "", "127.0.0.1", "auth2")
 	db, err := sql.Open("mysql", dbConn)
 	if err != nil {
 		panic(err.Error())

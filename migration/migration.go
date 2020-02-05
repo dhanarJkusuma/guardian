@@ -12,11 +12,12 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/dhanarJkusuma/guardian"
 	"github.com/dhanarJkusuma/guardian/schema"
 )
 
 var (
+	ErrMigration = "error while migrating rbac-database, reason = %s"
+
 	ErrMigrationAlreadyExist = errors.New("error while running migration, migration already exist")
 	ErrMigrationHistory      = errors.New("error while record migration history")
 )
@@ -29,6 +30,7 @@ type indexSchema struct {
 	IndexName string `db:"index_name"`
 }
 
+// requiredIndexes is used for check existing required indexes in the database
 var requiredIndexes = map[string]bool{
 	"rbac_user_email_idx":                      false,
 	"rbac_user_username_idx":                   false,
@@ -146,9 +148,9 @@ func (m *Migration) Down() {
 }
 
 // Run function will run custom migration
-func (m *Migration) Run(name string, executor func(ptx *guardian.GuardTx) error) error {
+func (m *Migration) Run(name string, executor func(ptx *GuardTx) error) error {
 	var err error
-	ptx := &guardian.GuardTx{}
+	ptx := &GuardTx{}
 
 	// init begin transaction db
 	err = ptx.BeginTx(m.dbConnection)
@@ -195,7 +197,7 @@ func (m *Migration) validateIndexes() error {
 	rows, err := m.dbConnection.Query(querySchema, m.schemaName, "PRIMARY")
 	if err != nil {
 		log.Println(err)
-		return errors.New(fmt.Sprintf(guardian.ErrMigration, "error while checking the tables"))
+		return errors.New(fmt.Sprintf(ErrMigration, "error while checking the tables"))
 	}
 
 	var index indexSchema
@@ -203,7 +205,7 @@ func (m *Migration) validateIndexes() error {
 		err = rows.Scan(&index.IndexName)
 		if err != nil {
 			log.Println(err)
-			return errors.New(fmt.Sprintf(guardian.ErrMigration, "error while checking the indexes"))
+			return errors.New(fmt.Sprintf(ErrMigration, "error while checking the indexes"))
 		}
 
 		if _, ok := requiredIndexes[index.IndexName]; ok {

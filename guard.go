@@ -2,7 +2,6 @@ package guardian
 
 import (
 	"database/sql"
-	"errors"
 	"github.com/dhanarJkusuma/guardian/auth"
 	"github.com/dhanarJkusuma/guardian/auth/password"
 	"github.com/dhanarJkusuma/guardian/auth/token"
@@ -17,14 +16,7 @@ type AuthManager interface {
 }
 
 // Constants for Error Messaging
-const (
-	ErrMigration = "error while migrating rbac-database, reason = %s"
-)
-
-var (
-	ErrNoSchema      = errors.New("no schema provided")
-	ErrInvalidParams = errors.New("invalid params")
-)
+const ()
 
 // Guardian wrap all needed function for authentication in the guardian library
 type Guardian struct {

@@ -1,10 +1,10 @@
-package guardian
+package migration
 
 import (
 	"database/sql"
-	"github.com/dhanarJkusuma/guardian/migration"
-	"github.com/dhanarJkusuma/guardian/schema"
 	"log"
+
+	"github.com/dhanarJkusuma/guardian/schema"
 )
 
 // GuardTx is used for custom schema migration
@@ -74,7 +74,7 @@ func (gtx *GuardTx) FinishTx(err error) error {
 		gtx.dbTx.Rollback()
 		panic(p)
 	} else if err != nil {
-		if err == migration.ErrMigrationAlreadyExist {
+		if err == ErrMigrationAlreadyExist {
 			log.Println("migration already exist")
 		} else {
 			log.Fatal("failed to run migration, err = ", err)

@@ -3,7 +3,6 @@ package schema
 import (
 	"context"
 	"database/sql"
-	"github.com/dhanarJkusuma/guardian"
 	"strings"
 	"time"
 )
@@ -49,7 +48,7 @@ const insertRuleQuery = `
 // CreateRule function will create a new record of rule entity
 func (r *Rule) CreateRule() error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	result, err := r.DBContract.Exec(
 		insertRuleQuery,
@@ -68,7 +67,7 @@ func (r *Rule) CreateRule() error {
 // CreateRuleContext function will create a new record of rule entity with specific context
 func (r *Rule) CreateRuleContext(ctx context.Context) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	result, err := r.DBContract.ExecContext(
 		ctx,
@@ -98,7 +97,7 @@ const saveRuleQuery = `
 // otherwise it will create a new one
 func (r *Rule) Save() error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	result, err := r.DBContract.Exec(
@@ -120,7 +119,7 @@ func (r *Rule) Save() error {
 // otherwise it will create a new one
 func (r *Rule) SaveContext(ctx context.Context) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	result, err := r.DBContract.ExecContext(
@@ -144,7 +143,7 @@ const deleteRuleQuery = `DELETE FROM rbac_rule WHERE id = ?`
 // if rule has no ID, than error will be returned
 func (r *Rule) Delete() error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	if r.ID <= 0 {
@@ -164,7 +163,7 @@ func (r *Rule) Delete() error {
 // if rule has no ID, than error will be returned
 func (r *Rule) DeleteContext(ctx context.Context) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	if r.ID <= 0 {
 		return ErrInvalidID
@@ -195,7 +194,7 @@ const fetchRuleQuery = `
 // This function will fetch the data from database and search by name
 func (r *Rule) GetRule(name string) (*Rule, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var rule = new(Rule)
@@ -221,7 +220,7 @@ func (r *Rule) GetRule(name string) (*Rule, error) {
 // This function will fetch the data from database and search by name
 func (r *Rule) GetRuleContext(ctx context.Context, name string) (*Rule, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var rule = new(Rule)
@@ -258,7 +257,7 @@ const fetchRuleByRuleTypeAndParentIDs = `
 // GetRolesRule function will return a collection of rule entity by specific roles
 func (r *Rule) GetRolesRule(roles []Role) ([]Rule, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	args := make([]interface{}, len(roles))
@@ -300,7 +299,7 @@ func (r *Rule) GetRolesRule(roles []Role) ([]Rule, error) {
 // GetRolesRuleContext function will return a collection of rule entity by specific roles
 func (r *Rule) GetRolesRuleContext(ctx context.Context, roles []Role) ([]Rule, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	args := make([]interface{}, len(roles))
@@ -354,7 +353,7 @@ const fetchRuleByRuleTypeAndParentID = `
 // GetPermissionRule function will return a collection of rule entity by specific permissions
 func (r *Rule) GetPermissionRule(permission Permission) ([]Rule, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 	if permission.ID <= 0 {
 		return nil, ErrInvalidID
@@ -391,7 +390,7 @@ func (r *Rule) GetPermissionRule(permission Permission) ([]Rule, error) {
 // GetPermissionRule function will return a collection of rule entity by specific permissions
 func (r *Rule) GetPermissionRuleContext(ctx context.Context, permission Permission) ([]Rule, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 	if permission.ID <= 0 {
 		return nil, ErrInvalidID

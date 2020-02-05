@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"time"
-
-	"github.com/dhanarJkusuma/guardian"
 )
 
 // Role represents `rbac_role` table in the database
@@ -30,7 +28,7 @@ const insertRoleQuery = `
 // CreateRole function will create a new record of role entity
 func (r *Role) CreateRole() error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	result, err := r.DBContract.Exec(
 		insertRoleQuery,
@@ -48,7 +46,7 @@ func (r *Role) CreateRole() error {
 // CreateRoleContext function will create a new record of role entity with specific context
 func (r *Role) CreateRoleContext(ctx context.Context) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	result, err := r.DBContract.ExecContext(
 		ctx,
@@ -76,7 +74,7 @@ const saveRoleQuery = `
 // otherwise it will create a new one
 func (r *Role) Save() error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	result, err := r.DBContract.Exec(
@@ -97,7 +95,7 @@ func (r *Role) Save() error {
 // otherwise it will create a new one
 func (r *Role) SaveContext(ctx context.Context) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	result, err := r.DBContract.ExecContext(
@@ -120,7 +118,7 @@ const deleteRoleQuery = `DELETE FROM rbac_role WHERE id = ?`
 // if role has no ID, than error will be returned
 func (r *Role) Delete() error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 
 	if r.ID <= 0 {
@@ -140,7 +138,7 @@ func (r *Role) Delete() error {
 // if role has no ID, than error will be returned
 func (r *Role) DeleteContext(ctx context.Context) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	if r.ID <= 0 {
 		return ErrInvalidID
@@ -167,7 +165,7 @@ const assignRoleQuery = `
 // This function will create a new record in the database to create relation between user and role
 func (r *Role) Assign(u *User) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	if r.ID <= 0 || u.ID <= 0 {
 		return ErrInvalidID
@@ -188,7 +186,7 @@ func (r *Role) Assign(u *User) error {
 // This function will create a new record in the database to create relation between user and role
 func (r *Role) AssignContext(ctx context.Context, u *User) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	if r.ID <= 0 || u.ID <= 0 {
 		return ErrInvalidID
@@ -212,7 +210,7 @@ const revokeRoleQuery = `DELETE FROM rbac_user_role WHERE role_id = ? AND user_i
 // This function will delete the relation between user and role
 func (r *Role) Revoke(u *User) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	if r.ID <= 0 || u.ID <= 0 {
 		return ErrInvalidID
@@ -234,7 +232,7 @@ func (r *Role) Revoke(u *User) error {
 // This function will delete the relation between user and role
 func (r *Role) RevokeContext(ctx context.Context, u *User) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	if r.ID <= 0 || u.ID <= 0 {
 		return ErrInvalidID
@@ -264,7 +262,7 @@ const addPermissionQuery = `
 // This function will create a new record in the table relation between role and permission
 func (r *Role) AddPermission(p *Permission) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	if r.ID <= 0 || p.ID <= 0 {
 		return ErrInvalidID
@@ -285,7 +283,7 @@ func (r *Role) AddPermission(p *Permission) error {
 // This function will create a new record in the table relation between role and permission
 func (r *Role) AddPermissionContext(ctx context.Context, p *Permission) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	_, err := r.DBContract.ExecContext(
 		ctx,
@@ -305,7 +303,7 @@ const removePermissionQuery = `DELETE FROM rbac_role_permission WHERE role_id = 
 // This function will delete relation data record in the table relation between role and permission
 func (r *Role) RemovePermission(p *Permission) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	if r.ID <= 0 || p.ID <= 0 {
 		return ErrInvalidID
@@ -326,7 +324,7 @@ func (r *Role) RemovePermission(p *Permission) error {
 // This function will delete relation data record in the table relation between role and permission
 func (r *Role) RemovePermissionContext(ctx context.Context, p *Permission) error {
 	if r.DBContract == nil {
-		return guardian.ErrNoSchema
+		return ErrNoSchema
 	}
 	if r.ID <= 0 || p.ID <= 0 {
 		return ErrInvalidID
@@ -361,7 +359,7 @@ const getPermissionQuery = `
 // GetPermissions function will return the permission collection by specific role
 func (r *Role) GetPermissions() ([]Permission, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	permissions := make([]Permission, 0)
@@ -396,7 +394,7 @@ func (r *Role) GetPermissions() ([]Permission, error) {
 // GetPermissions function will return the permission collection by specific role and context
 func (r *Role) GetPermissionsContext(ctx context.Context) ([]Permission, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	permissions := make([]Permission, 0)
@@ -440,7 +438,7 @@ const fetchRoleQuery = `
 // This function will fetch the data from database and search by name
 func (r *Role) GetRole(name string) (*Role, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var role = new(Role)
@@ -465,7 +463,7 @@ func (r *Role) GetRole(name string) (*Role, error) {
 // This function will fetch the data from database and search by name
 func (r *Role) GetRoleContext(ctx context.Context, name string) (*Role, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	var role = new(Role)
@@ -503,7 +501,7 @@ const fetchRolesResourceQuery = `
 // This function will fetch the data from database and search by user_id, method, and route
 func (r *Role) GetRolesResource(user *User, method, route string) ([]Role, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	if user == nil || user.ID <= 0 {
@@ -541,7 +539,7 @@ func (r *Role) GetRolesResource(user *User, method, route string) ([]Role, error
 // This function will fetch the data from database and search by user_id, method, and route
 func (r *Role) GetRolesResourceContext(ctx context.Context, user *User, method, route string) ([]Role, error) {
 	if r.DBContract == nil {
-		return nil, guardian.ErrNoSchema
+		return nil, ErrNoSchema
 	}
 
 	if user == nil || user.ID <= 0 {

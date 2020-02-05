@@ -19,7 +19,9 @@ type existRecord struct {
 }
 
 var (
-	ErrInvalidID = errors.New("invalid id")
+	ErrInvalidID     = errors.New("invalid id")
+	ErrNoSchema      = errors.New("no schema provided")
+	ErrInvalidParams = errors.New("invalid params")
 )
 
 // DbContract interface will provide database behaviour if you want to using dbTx function
