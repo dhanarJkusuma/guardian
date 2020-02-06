@@ -84,7 +84,7 @@ When func below is called. Then `guardian` will create db_schema for you.
 	}
 ```
 You can make custom migration by calling Run() function. This function belongs to Migration struct.
-if you wan't to run custom migration you should write migration `name` uniquely, otherwise your migration won't be executed.
+if you want to run custom migration you should write migration `name` uniquely, otherwise your migration won't be executed.
 
 
 ### Protect the HTTP Route
@@ -132,3 +132,63 @@ func (h *HttpHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 ```
 SignIn method will return loggedUser, token, and error. Token is used to authenticate user login, by `Authorization` header.
 After you get the token, you can try to access private route using header `Authorization` with value `Bearer <token>`
+
+### Define a Rule
+If you want to define some `rule`, you can add the rules constrain in the database.
+```go
+        // run migration for create dashboard route and rule
+	err = guard.Migration.Run("dashboard_rule", func(g *migration.GuardTx) error {
+		var errMig error
+
+		// create permission
+		dashboardPermission := &schema.Permission{
+			Name:   "dashboard_owner",
+			Method: http.MethodGet,
+			Route:  "/dashboard",
+		}
+		errMig = g.Permission(dashboardPermission).Save()
+		if errMig != nil {
+			return errMig
+		}
+
+		// create rule
+		dashboardRule := &schema.Rule{
+			RuleType: schema.EnumRuleTypes.PermissionRuleType,
+			ParentID: dashboardPermission.ID,
+			Name:     "rule_dashboard_owner",
+		}
+		errMig = g.Rule(dashboardRule).Save()
+		if errMig != nil {
+			return errMig
+		}
+		return nil
+	})
+```
+Then, create a `rule` function using RuleExecutor interface that need to implement `Name()` and `Execute(*schema.User, *rule.schema.Rule, r *http.Request)` function
+```go
+type DashboardRule struct {
+	// could be contains database connection or something
+}
+
+func (d *DashboardRule) Name() string {
+	return "rule_dashboard_owner"
+}
+
+func (d *DashboardRule) Execute(user *schema.User, rule *schema.Rule, r *http.Request) bool {
+	query := r.URL.Query()
+	paramsID := query.Get("user_id")
+
+	userID, err := strconv.ParseInt(paramsID, 10, 64)
+	if err != nil {
+		return false
+	}
+
+	return user.ID == userID
+}
+
+```
+After that, register `rule` function using `Auth.RegisterRule()`
+```go
+        // register the rule
+	guard.Auth.RegisterRule(&DashboardRule{})
+```
