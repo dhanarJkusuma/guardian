@@ -11,9 +11,9 @@ import (
 
 	"github.com/go-redis/redis"
 
-	"github.com/dhanarJkusuma/guardian/schema"
 	"github.com/dhanarJkusuma/guardian/auth/password"
 	"github.com/dhanarJkusuma/guardian/auth/token"
+	"github.com/dhanarJkusuma/guardian/schema"
 )
 
 var (
@@ -236,13 +236,15 @@ func (a *Auth) Logout(request *http.Request) error {
 // Register function will create a new user with hashed password that provided by auth module
 // This function will return error that indicate user creation is success or not
 func (a *Auth) Register(user *schema.User) error {
-	userSchema := a.dbSchema.User(user)
-	userSchema.Password = a.passwordStrategy.HashPassword(user.Password)
-	return userSchema.CreateUser()
+	if user.DBContract == nil {
+		user = a.dbSchema.User(user)
+	}
+	user.Password = a.passwordStrategy.HashPassword(user.Password)
+	return user.CreateUser()
 }
 
 /* HTTP Protection */
-func (a *Auth) authenticateRoute(w http.ResponseWriter, r *http.Request, strategy int) error {
+func (a *Auth) authenticateRoute(w http.ResponseWriter, r *http.Request, strategy int) (*schema.User, error) {
 	user, err := a.getUserPrinciple(r, strategy)
 	if err != nil {
 		switch strategy {
@@ -250,20 +252,21 @@ func (a *Auth) authenticateRoute(w http.ResponseWriter, r *http.Request, strateg
 			a.ClearSession(w, r)
 		}
 		w.WriteHeader(http.StatusUnauthorized)
-		return err
+		return nil, err
 	}
-	ctx := context.WithValue(r.Context(), UserPrinciple, user)
-	r = r.WithContext(ctx)
-	return nil
+	return user, nil
 }
 
 // AuthenticateCookieHandler is a middleware func that protect the specific route handler using cookie based authentication
 func (a *Auth) AuthenticateCookieHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		err := a.authenticateRoute(w, r, CookieBasedAuth)
+		user, err := a.authenticateRoute(w, r, CookieBasedAuth)
 		if err != nil {
 			return
 		}
+		ctx := context.WithValue(r.Context(), UserPrinciple, user)
+		r = r.WithContext(ctx)
+
 		handler.ServeHTTP(w, r)
 	})
 }
@@ -271,10 +274,13 @@ func (a *Auth) AuthenticateCookieHandler(handler http.Handler) http.Handler {
 // AuthenticateCookieHandlerFunc is a middleware func that protect the specific route handler as handlerFunc using cookie based authentication
 func (a *Auth) AuthenticateCookieHandlerFunc(handler func(w http.ResponseWriter, r *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := a.authenticateRoute(w, r, CookieBasedAuth)
+		user, err := a.authenticateRoute(w, r, CookieBasedAuth)
 		if err != nil {
 			return
 		}
+		ctx := context.WithValue(r.Context(), UserPrinciple, user)
+		r = r.WithContext(ctx)
+
 		handler(w, r)
 	}
 }
@@ -282,10 +288,21 @@ func (a *Auth) AuthenticateCookieHandlerFunc(handler func(w http.ResponseWriter,
 // AuthenticateHandler is a middleware func that protect the specific route handler using token based authentication
 func (a *Auth) AuthenticateHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		err := a.authenticateRoute(w, r, TokenBasedAuth)
+		user, err := a.authenticateRoute(w, r, TokenBasedAuth)
 		if err != nil {
 			return
 		}
+
+		// execute all rules
+		err = a.executeRule(w, r, user, false)
+		if err != nil {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), UserPrinciple, user)
+		r = r.WithContext(ctx)
+
 		handler.ServeHTTP(w, r)
 	})
 }
@@ -293,18 +310,28 @@ func (a *Auth) AuthenticateHandler(handler http.Handler) http.Handler {
 // AuthenticateHandlerFunc is a middleware func that protect the specific route handler as handlerFunc using token based authentication
 func (a *Auth) AuthenticateHandlerFunc(handler func(w http.ResponseWriter, r *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := a.authenticateRoute(w, r, TokenBasedAuth)
+		// authenticate user by route
+		user, err := a.authenticateRoute(w, r, TokenBasedAuth)
 		if err != nil {
 			return
 		}
+
+		// execute all rules
+		err = a.executeRule(w, r, user, false)
+		if err != nil {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), UserPrinciple, user)
+		r = r.WithContext(ctx)
 		handler(w, r)
 	}
 }
 
 // authenticateRBAC will authenticate user role and permission.
 // this function will execute all rules that associated with this specific role, and permission
-func (a *Auth) authenticateRBAC(w http.ResponseWriter, r *http.Request) error {
-	user := GetUserLogin(r)
+func (a *Auth) authenticateRBAC(w http.ResponseWriter, r *http.Request, user *schema.User) error {
 	if user == nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return errors.New("user not found")
@@ -313,11 +340,41 @@ func (a *Auth) authenticateRBAC(w http.ResponseWriter, r *http.Request) error {
 	isAllowed, err := a.dbSchema.User(user).CanAccess(r.Method, r.URL.Path)
 	if err != nil || !isAllowed {
 		w.WriteHeader(http.StatusForbidden)
+		return errors.New("forbidden to access resource")
+	}
+
+	// execute all rules
+	err = a.executeRule(w, r, user, true)
+	if err != nil {
+		w.WriteHeader(http.StatusForbidden)
+		return errors.New("forbidden to access resource")
+	}
+
+	return nil
+}
+
+// executeRule function will execute all rules that associated with permission or roles depend on isRbac flag
+func (a *Auth) executeRule(w http.ResponseWriter, r *http.Request, user *schema.User, isRbac bool) error {
+	var rules []schema.Rule
+	ctx := r.Context()
+
+	// execute all rules associated with permission
+	permission, err := a.dbSchema.Permission(nil).GetPermissionByResource(r.Method, r.URL.Path)
+	if err != nil {
+		return err
+	}
+	rules, err = a.dbSchema.Rule(nil).GetPermissionRuleContext(ctx, *permission)
+	err = a.executeRules(r, user, rules)
+	if err != nil {
 		return err
 	}
 
-	// check rule for specific resource
-	ctx := r.Context()
+	// break this process when not require rbac authentication
+	if !isRbac {
+		return nil
+	}
+
+	// execute all rules associated with roles
 	roles, err := a.dbSchema.Role(nil).GetRolesResourceContext(
 		ctx,
 		user,
@@ -325,47 +382,25 @@ func (a *Auth) authenticateRBAC(w http.ResponseWriter, r *http.Request) error {
 		r.URL.Path,
 	)
 	if err != nil {
-		w.WriteHeader(http.StatusForbidden)
 		return err
 	}
-
-	permission, err := a.dbSchema.Permission(nil).GetPermissionByResource(r.Method, r.URL.Path)
-	if err != nil {
-		w.WriteHeader(http.StatusForbidden)
-		return err
-	}
-
-	var rules []schema.Rule
-
-	// check rules by Role schema
 	rules, err = a.dbSchema.Rule(nil).GetRolesRule(roles)
 	if err != nil {
-		w.WriteHeader(http.StatusForbidden)
 		return err
 	}
 
-	err = a.executeRules(user, rules)
+	err = a.executeRules(r, user, rules)
 	if err != nil {
-		w.WriteHeader(http.StatusForbidden)
 		return err
 	}
-
-	// check rules by Permission schema
-	rules, err = a.dbSchema.Rule(nil).GetPermissionRuleContext(ctx, *permission)
-	err = a.executeRules(user, rules)
-	if err != nil {
-		w.WriteHeader(http.StatusForbidden)
-		return err
-	}
-
 	return nil
 }
 
 // executeRules will execute all rule in rules collection
-func (a *Auth) executeRules(user *schema.User, rules []schema.Rule) error {
+func (a *Auth) executeRules(r *http.Request, user *schema.User, rules []schema.Rule) error {
 	for _, rule := range rules {
 		if ruleExecutor, ok := a.rules[rule.Name]; ok {
-			isRuleAllowed := ruleExecutor.Execute(user)
+			isRuleAllowed := ruleExecutor.Execute(user, &rule, r)
 			if !isRuleAllowed {
 				return errors.New(fmt.Sprintf("blocked by rule %s", ruleExecutor.Name()))
 			}
@@ -378,15 +413,20 @@ func (a *Auth) executeRules(user *schema.User, rules []schema.Rule) error {
 func (a *Auth) AuthenticateRBACCookieHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var err error
-		err = a.authenticateRoute(w, r, CookieBasedAuth)
+		var user *schema.User
+
+		user, err = a.authenticateRoute(w, r, CookieBasedAuth)
 		if err != nil {
 			return
 		}
 
-		err = a.authenticateRBAC(w, r)
+		err = a.authenticateRBAC(w, r, user)
 		if err != nil {
 			return
 		}
+
+		ctx := context.WithValue(r.Context(), UserPrinciple, user)
+		r = r.WithContext(ctx)
 
 		handler.ServeHTTP(w, r)
 	})
@@ -396,15 +436,20 @@ func (a *Auth) AuthenticateRBACCookieHandler(handler http.Handler) http.Handler 
 func (a *Auth) AuthenticateRBACCookieHandlerFunc(handler func(w http.ResponseWriter, r *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var err error
-		err = a.authenticateRoute(w, r, CookieBasedAuth)
+		var user *schema.User
+
+		user, err = a.authenticateRoute(w, r, CookieBasedAuth)
 		if err != nil {
 			return
 		}
 
-		err = a.authenticateRBAC(w, r)
+		err = a.authenticateRBAC(w, r, user)
 		if err != nil {
 			return
 		}
+
+		ctx := context.WithValue(r.Context(), UserPrinciple, user)
+		r = r.WithContext(ctx)
 
 		handler(w, r)
 	}
@@ -414,15 +459,20 @@ func (a *Auth) AuthenticateRBACCookieHandlerFunc(handler func(w http.ResponseWri
 func (a *Auth) AuthenticateRBACHandler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var err error
-		err = a.authenticateRoute(w, r, TokenBasedAuth)
+		var user *schema.User
+
+		user, err = a.authenticateRoute(w, r, TokenBasedAuth)
 		if err != nil {
 			return
 		}
 
-		err = a.authenticateRBAC(w, r)
+		err = a.authenticateRBAC(w, r, user)
 		if err != nil {
 			return
 		}
+
+		ctx := context.WithValue(r.Context(), UserPrinciple, user)
+		r = r.WithContext(ctx)
 
 		handler.ServeHTTP(w, r)
 	})
@@ -432,15 +482,20 @@ func (a *Auth) AuthenticateRBACHandler(handler http.Handler) http.Handler {
 func (a *Auth) AuthenticateRBACHandlerFunc(handler func(w http.ResponseWriter, r *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var err error
-		err = a.authenticateRoute(w, r, TokenBasedAuth)
+		var user *schema.User
+
+		user, err = a.authenticateRoute(w, r, TokenBasedAuth)
 		if err != nil {
 			return
 		}
 
-		err = a.authenticateRBAC(w, r)
+		err = a.authenticateRBAC(w, r, user)
 		if err != nil {
 			return
 		}
+
+		ctx := context.WithValue(r.Context(), UserPrinciple, user)
+		r = r.WithContext(ctx)
 
 		handler(w, r)
 	}
@@ -515,5 +570,9 @@ func (a *Auth) getUserPrinciple(r *http.Request, strategy int) (*schema.User, er
 // If not it'll return nil user data
 func GetUserLogin(r *http.Request) *schema.User {
 	ctx := r.Context()
-	return ctx.Value(UserPrinciple).(*schema.User)
+	user := ctx.Value(UserPrinciple)
+	if user != nil {
+		return user.(*schema.User)
+	}
+	return nil
 }

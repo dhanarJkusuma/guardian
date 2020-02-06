@@ -2,21 +2,14 @@ package migration
 
 import (
 	"database/sql"
-	"log"
-
+	"github.com/dhanarJkusuma/guardian/auth"
 	"github.com/dhanarJkusuma/guardian/schema"
 )
 
 // GuardTx is used for custom schema migration
 type GuardTx struct {
 	dbTx *sql.Tx
-}
-
-// BeginTx will begin database transaction
-func (gtx *GuardTx) BeginTx(dbConnection *sql.DB) error {
-	tx, err := dbConnection.Begin()
-	gtx.dbTx = tx
-	return err
+	Auth *auth.Auth
 }
 
 // User will inject the databaseTx in the `User` schema
@@ -66,20 +59,4 @@ func (gtx *GuardTx) Rule(rule *schema.Rule) *schema.Rule {
 // GetTx function will return specific database transaction
 func (gtx *GuardTx) GetTx() *sql.Tx {
 	return gtx.dbTx
-}
-
-// FinishTx will do rollback function if there is an error in the custom migration or panic has occur
-func (gtx *GuardTx) FinishTx(err error) error {
-	if p := recover(); p != nil {
-		gtx.dbTx.Rollback()
-		panic(p)
-	} else if err != nil {
-		if err == ErrMigrationAlreadyExist {
-			log.Println("migration already exist")
-		} else {
-			log.Fatal("failed to run migration, err = ", err)
-		}
-		return gtx.dbTx.Rollback()
-	}
-	return gtx.dbTx.Commit()
 }

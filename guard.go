@@ -8,15 +8,7 @@ import (
 	"github.com/dhanarJkusuma/guardian/migration"
 	"github.com/dhanarJkusuma/guardian/schema"
 	"github.com/go-redis/redis"
-	"log"
 )
-
-type AuthManager interface {
-	GenerateToken()
-}
-
-// Constants for Error Messaging
-const ()
 
 // Guardian wrap all needed function for authentication in the guardian library
 type Guardian struct {
@@ -27,15 +19,14 @@ type Guardian struct {
 }
 
 type SessionOptions struct {
+	CacheClient      *redis.Client
 	LoginMethod      auth.LoginMethod
 	SessionName      string
-	Origin           string
 	ExpiredInSeconds int64
 }
 
 type Options struct {
 	DbConnection *sql.DB
-	CacheClient  *redis.Client
 	SchemaName   string
 	Session      SessionOptions
 }
@@ -71,7 +62,7 @@ func (p *guardianBuilder) SetPasswordGenerator(generator password.PasswordGenera
 	return p
 }
 
-// Build will set all required parameters
+// Build() will set all required parameters
 func (p *guardianBuilder) Build() *Guardian {
 	rbac := &Guardian{
 		guardSchema: &schema.Schema{DbConnection: p.guardOpts.DbConnection},
@@ -79,9 +70,10 @@ func (p *guardianBuilder) Build() *Guardian {
 
 	// initialize auth module
 	authModule := auth.NewAuth(auth.Options{
-		SessionName:  p.guardOpts.Session.SessionName,
-		GuardSchema:  rbac.guardSchema,
-		CacheClient:  p.guardOpts.CacheClient,
+		SessionName: p.guardOpts.Session.SessionName,
+		GuardSchema: rbac.guardSchema,
+
+		CacheClient:  p.guardOpts.Session.CacheClient,
 		LoginMethod:  p.guardOpts.Session.LoginMethod,
 		ExpiredInSec: p.guardOpts.Session.ExpiredInSeconds,
 
@@ -90,16 +82,17 @@ func (p *guardianBuilder) Build() *Guardian {
 	})
 
 	// initialize migration module
-	migrator, err := migration.NewMigration(migration.MigrationOptions{
+	migrationModule, err := migration.NewMigration(migration.MigrationOptions{
 		Schema:       p.guardOpts.SchemaName,
 		DBConnection: p.guardOpts.DbConnection,
+		Auth:         authModule,
 	})
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	// set migration and auth module
-	rbac.Migration = migrator
+	rbac.Migration = migrationModule
 	rbac.Auth = authModule
 	return rbac
 }

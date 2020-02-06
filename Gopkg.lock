@@ -26,6 +26,14 @@
   version = "v1.5.0"
 
 [[projects]]
+  digest = "1:cbec35fe4d5a4fba369a656a8cd65e244ea2c743007d8f6c1ccb132acf9d1296"
+  name = "github.com/gorilla/mux"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "00bdffe0f3c77e27d2cf6f5c70232a2d3e4d9c15"
+  version = "v1.7.3"
+
+[[projects]]
   digest = "1:274f67cb6fed9588ea2521ecdac05a6d62a8c51c074c1fccc6a49a40ba80e925"
   name = "github.com/satori/go.uuid"
   packages = ["."]
@@ -50,6 +58,7 @@
   input-imports = [
     "github.com/go-redis/redis",
     "github.com/go-sql-driver/mysql",
+    "github.com/gorilla/mux",
     "github.com/satori/go.uuid",
     "golang.org/x/crypto/bcrypt",
   ]

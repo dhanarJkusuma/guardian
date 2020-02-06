@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/dhanarJkusuma/guardian/auth"
 	"io/ioutil"
 	"log"
 	"os"
@@ -32,26 +33,28 @@ type indexSchema struct {
 
 // requiredIndexes is used for check existing required indexes in the database
 var requiredIndexes = map[string]bool{
-	"rbac_user_email_idx":                      false,
-	"rbac_user_username_idx":                   false,
-	"rbac_permission_route_method_idx":         false,
-	"rbac_permission_name_idx":                 false,
-	"rbac_role_name_idx":                       false,
-	"rbac_user_role_role_user_idx":             false,
-	"rbac_role_permission_role_permission_idx": false,
-	"rbac_role_rbac_rule_idx":                  false,
-	"rbac_role_rbac_rule_checker_idx":          false,
+	"guard_user_email_idx":                      false,
+	"guard_user_username_idx":                   false,
+	"guard_permission_route_method_idx":         false,
+	"guard_permission_name_idx":                 false,
+	"guard_role_name_idx":                       false,
+	"guard_user_role_role_user_idx":             false,
+	"guard_role_permission_role_permission_idx": false,
+	"guard_role_guard_rule_idx":                 false,
+	"guard_role_guard_rule_checker_idx":         false,
 }
 
 // Migration represent entity that has responsibility for schema migration
 type Migration struct {
-	dbConnection *sql.DB
 	schemaName   string
+	dbConnection *sql.DB
+	authModule   *auth.Auth
 }
 
 type MigrationOptions struct {
-	DBConnection *sql.DB
 	Schema       string
+	DBConnection *sql.DB
+	Auth         *auth.Auth
 }
 
 // NewMigration acts as constructor with required params
@@ -59,6 +62,7 @@ func NewMigration(opts MigrationOptions) (*Migration, error) {
 	m := &Migration{
 		schemaName:   opts.Schema,
 		dbConnection: opts.DBConnection,
+		authModule:   opts.Auth,
 	}
 	return m, nil
 }
@@ -148,19 +152,31 @@ func (m *Migration) Down() {
 }
 
 // Run function will run custom migration
-func (m *Migration) Run(name string, executor func(ptx *GuardTx) error) error {
+func (m *Migration) Run(name string, f func(ptx *GuardTx) error) error {
 	var err error
-	ptx := &GuardTx{}
+	gtx := &GuardTx{Auth: m.authModule}
 
 	// init begin transaction db
-	err = ptx.BeginTx(m.dbConnection)
-	if err != nil {
-		return err
-	}
-	defer ptx.FinishTx(err)
+	tx, err := m.dbConnection.Begin()
+	gtx.dbTx = tx
+
+	defer func(err error) {
+		if p := recover(); p != nil {
+			err = gtx.dbTx.Rollback()
+			panic(p)
+		} else if err != nil {
+			if err == ErrMigrationAlreadyExist {
+				log.Println("migration already exist")
+			} else {
+				log.Fatal("failed to run migration, err = ", err)
+			}
+			err = gtx.dbTx.Rollback()
+		}
+		err = gtx.dbTx.Commit()
+	}(err)
 
 	// init migration schema
-	migrationSchema := &schema.MigrationSchema{schema.Entity{DBContract: ptx.GetTx()}}
+	migrationSchema := &schema.MigrationSchema{schema.Entity{DBContract: gtx.GetTx()}}
 
 	// check existing migration
 	alreadyRun, err := migrationSchema.CheckExistingMigration(name)
@@ -173,7 +189,7 @@ func (m *Migration) Run(name string, executor func(ptx *GuardTx) error) error {
 	}
 
 	// run migration
-	err = executor(ptx)
+	err = f(gtx)
 	if err == nil {
 		errRecordMigration := migrationSchema.WriteMigration(name)
 		if errRecordMigration != nil {

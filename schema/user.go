@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// User represents `rbac_user` table in the database
+// User represents `guard_user` table in the database
 type User struct {
 	Entity
 
@@ -22,7 +22,7 @@ type User struct {
 }
 
 const insertUserQuery = `
-	INSERT INTO rbac_user (
+	INSERT INTO guard_user (
 		email,
 		username,
 		password
@@ -72,7 +72,7 @@ func (u *User) CreateUserContext(ctx context.Context) error {
 }
 
 const saveUserQuery = `
-	INSERT INTO rbac_user (
+	INSERT INTO guard_user (
 		email,
 		username,
 		password,
@@ -134,7 +134,7 @@ func (u *User) SaveContext(ctx context.Context) error {
 	return nil
 }
 
-const deleteUserQuery = `DELETE FROM rbac_user WHERE id = ?`
+const deleteUserQuery = `DELETE FROM guard_user WHERE id = ?`
 
 // Delete function will save delete user entity with specific ID
 // if user has no ID, than error will be returned
@@ -183,9 +183,9 @@ const getAccessQuery = `
  	SELECT EXISTS(
 		SELECT 
 			*
-		FROM rbac_user_role ur 
-		JOIN rbac_role_permission rp ON ur.role_id = rp.role_id
-		JOIN rbac_permission p ON p.id = rp. permission_id 
+		FROM guard_user_role ur 
+		JOIN guard_role_permission rp ON ur.role_id = rp.role_id
+		JOIN guard_permission p ON p.id = rp. permission_id 
 		WHERE ur.user_id = ? AND p.method = ? AND p.route = ?
 	) AS is_exist
 `
@@ -227,9 +227,9 @@ const getUserPermissionQuery = `
 	SELECT EXISTS(
 		SELECT 
 			*
-		FROM rbac_user_role ur 
-		JOIN rbac_role_permission rp ON ur.role_id = rp.role_id
-		JOIN rbac_permission p ON p.id = rp. permission_id 
+		FROM guard_user_role ur 
+		JOIN guard_role_permission rp ON ur.role_id = rp.role_id
+		JOIN guard_permission p ON p.id = rp. permission_id 
 		WHERE ur.user_id = ? AND p.name = ?
 	) AS is_exist
 `
@@ -270,8 +270,8 @@ const getUserRoleQuery = `
 	SELECT EXISTS(
 		SELECT 
 			*
-		FROM rbac_user_role ur 
-		JOIN rbac_role r ON ur.role_id = r.id 
+		FROM guard_user_role ur 
+		JOIN guard_role r ON ur.role_id = r.id 
 		WHERE ur.user_id = ? AND r.name = ? 
 	) AS is_exist
 `
@@ -314,8 +314,8 @@ const getUserRolesQuery = `
 		r.description,
 		r.created_at,
 		r.updated_at
-	FROM rbac_role r
-	JOIN rbac_user_role ur ON ur.role_id = r.id 
+	FROM guard_role r
+	JOIN guard_user_role ur ON ur.role_id = r.id 
 	WHERE ur.user_id = ?
 `
 
@@ -384,9 +384,9 @@ const getUserPermissionsQuery = `
 		p.description,
 		p.created_at,
 		p.updated_at
-	FROM rbac_permission p 
-	JOIN rbac_role_permission pr ON pr.permission_id = p.id
-	JOIN rbac_user_role ru ON ru.role_id = pr.role_id
+	FROM guard_permission p 
+	JOIN guard_role_permission pr ON pr.permission_id = p.id
+	JOIN guard_user_role ru ON ru.role_id = pr.role_id
 	WHERE ru.user_id = ?
 `
 
@@ -475,7 +475,7 @@ const fetchUserByUsernameOrEmail = `
 		active,
 		created_at,
 		updated_at
-	FROM rbac_user WHERE email = ? OR username = ? LIMIT 1
+	FROM guard_user WHERE email = ? OR username = ? LIMIT 1
 `
 
 // FindUserByUsernameOrEmail function will return existing user record by username or email
@@ -543,7 +543,7 @@ const fetchDynamicUserParams = `
 			active,
 			created_at,
 			updated_at
-		FROM rbac_user WHERE 
+		FROM guard_user WHERE 
 `
 
 // FindUser function will return existing user record by given parameters

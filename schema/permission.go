@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Permission represents `rbac_permission` table in the database
+// Permission represents `guard_permission` table in the database
 type Permission struct {
 	Entity
 
@@ -21,7 +21,7 @@ type Permission struct {
 }
 
 const insertPermissionQuery = `
-	INSERT INTO rbac_permission (
+	INSERT INTO guard_permission (
 		name, 
 		method,
 		route,
@@ -70,7 +70,7 @@ func (p *Permission) CreatePermissionContext(ctx context.Context) error {
 }
 
 const savePermissionQuery = `
-	INSERT INTO rbac_user (
+	INSERT INTO guard_permission (
 		name,
 		method,
 		route,
@@ -134,7 +134,7 @@ func (p *Permission) SaveContext(ctx context.Context) error {
 	return nil
 }
 
-const deletePermissionQuery = `DELETE FROM rbac_permission WHERE id = ?`
+const deletePermissionQuery = `DELETE FROM guard_permission WHERE id = ?`
 
 // Delete function will delete permission entity with specific ID
 // if permission has no ID, than error will be returned
@@ -186,7 +186,7 @@ const fetchPermissionQuery = `
 		description,
 		created_at,
 		updated_at
-	FROM rbac_permission WHERE name = ? LIMIT 1
+	FROM guard_permission WHERE name = ? LIMIT 1
 `
 
 // GetPermission function will get the permission entity by name
@@ -254,7 +254,7 @@ const fetchPermissionByResourceQuery = `
 		description,
 		created_at,
 		updated_at
-	FROM rbac_permission WHERE method = ? AND route = ?
+	FROM guard_permission WHERE method = ? AND route = ?
 `
 
 // GetPermissionByResource function will get the permission entity by resource

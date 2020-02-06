@@ -3,6 +3,7 @@ package schema
 import (
 	"context"
 	"database/sql"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -18,7 +19,7 @@ var EnumRuleTypes = RuleTypes{
 	PermissionRuleType: 9,
 }
 
-// Role represents `rbac_rule` table in the database
+// Role represents `guard_rule` table in the database
 type Rule struct {
 	Entity
 
@@ -34,11 +35,11 @@ type Rule struct {
 // RuleExecutor represent rule behaviour which acts as additional constraint to roles and permission
 type RuleExecutor interface {
 	Name() string
-	Execute(user *User) bool
+	Execute(user *User, rule *Rule, r *http.Request) bool
 }
 
 const insertRuleQuery = `
-	INSERT INTO rbac_role (
+	INSERT INTO guard_role (
 		rule_type,
 		parent_id,
 		name
@@ -85,7 +86,7 @@ func (r *Rule) CreateRuleContext(ctx context.Context) error {
 }
 
 const saveRuleQuery = `
-	INSERT INTO rbac_role (
+	INSERT INTO guard_rule (
 		rule_type,
 		parent_id,
 		name
@@ -102,6 +103,9 @@ func (r *Rule) Save() error {
 
 	result, err := r.DBContract.Exec(
 		saveRuleQuery,
+		r.RuleType,
+		r.ParentID,
+		r.Name,
 		r.RuleType,
 		r.ParentID,
 		r.Name,
@@ -137,7 +141,7 @@ func (r *Rule) SaveContext(ctx context.Context) error {
 	return nil
 }
 
-const deleteRuleQuery = `DELETE FROM rbac_rule WHERE id = ?`
+const deleteRuleQuery = `DELETE FROM guard_rule WHERE id = ?`
 
 // Delete function will delete rule entity with specific ID
 // if rule has no ID, than error will be returned
@@ -187,7 +191,7 @@ const fetchRuleQuery = `
 		name,
 		created_at,	
 		updated_at
-	FROM rbac_rule WHERE name = ?
+	FROM guard_rule WHERE name = ?
 `
 
 // GetRule function will get the rule entity by name
@@ -250,7 +254,7 @@ const fetchRuleByRuleTypeAndParentIDs = `
 		name,
 		created_at,	
 		updated_at
-	FROM rbac_rule 
+	FROM guard_rule 
 	WHERE rule_type = ? AND parent_id in (?) 
 `
 
@@ -265,7 +269,7 @@ func (r *Rule) GetRolesRule(roles []Role) ([]Rule, error) {
 	for i := range roles {
 		args = append(args, roles[i].ID)
 	}
-	inStmt := `(?` + strings.Repeat(",?", len(args)-1) + `)`
+	inStmt := `(?` + strings.Repeat(",?", len(roles)-1) + `)`
 	query := strings.Replace(fetchRuleByRuleTypeAndParentIDs, `(?)`, inStmt, -1)
 
 	var rule Rule
@@ -346,7 +350,7 @@ const fetchRuleByRuleTypeAndParentID = `
 		name,
 		created_at,	
 		updated_at
-	FROM rbac_rule 
+	FROM guard_rule 
 	WHERE rule_type = ? AND parent_id = ?
 `
 

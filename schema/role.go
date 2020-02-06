@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Role represents `rbac_role` table in the database
+// Role represents `guard_role` table in the database
 type Role struct {
 	Entity
 
@@ -19,7 +19,7 @@ type Role struct {
 }
 
 const insertRoleQuery = `
-	INSERT INTO rbac_role (
+	INSERT INTO guard_role (
 		name, 
 		description
 	) VALUES (?,?)
@@ -63,7 +63,7 @@ func (r *Role) CreateRoleContext(ctx context.Context) error {
 }
 
 const saveRoleQuery = `
-	INSERT INTO rbac_role (
+	INSERT INTO guard_role (
 		name,
 		description
 	) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = ?, description = ?
@@ -112,7 +112,7 @@ func (r *Role) SaveContext(ctx context.Context) error {
 	return nil
 }
 
-const deleteRoleQuery = `DELETE FROM rbac_role WHERE id = ?`
+const deleteRoleQuery = `DELETE FROM guard_role WHERE id = ?`
 
 // Delete function will delete role entity with specific ID
 // if role has no ID, than error will be returned
@@ -155,7 +155,7 @@ func (r *Role) DeleteContext(ctx context.Context) error {
 }
 
 const assignRoleQuery = `
-	INSERT INTO rbac_user_role (
+	INSERT INTO guard_user_role (
 		role_id, 
 		user_id
 	) VALUES (?,?)
@@ -204,7 +204,7 @@ func (r *Role) AssignContext(ctx context.Context, u *User) error {
 	return nil
 }
 
-const revokeRoleQuery = `DELETE FROM rbac_user_role WHERE role_id = ? AND user_id = ?`
+const revokeRoleQuery = `DELETE FROM guard_user_role WHERE role_id = ? AND user_id = ?`
 
 // Revoke function will revoke user's role by specific userID
 // This function will delete the relation between user and role
@@ -252,7 +252,7 @@ func (r *Role) RevokeContext(ctx context.Context, u *User) error {
 }
 
 const addPermissionQuery = `
-	INSERT INTO rbac_role_permission (
+	INSERT INTO guard_role_permission (
 		role_id, 
 		permission_id
 	) VALUES (?,?)
@@ -297,7 +297,7 @@ func (r *Role) AddPermissionContext(ctx context.Context, p *Permission) error {
 	return nil
 }
 
-const removePermissionQuery = `DELETE FROM rbac_role_permission WHERE role_id = ? AND permission_id = ?`
+const removePermissionQuery = `DELETE FROM guard_role_permission WHERE role_id = ? AND permission_id = ?`
 
 // RemovePermission function will delete relation between role with specific permission
 // This function will delete relation data record in the table relation between role and permission
@@ -351,8 +351,8 @@ const getPermissionQuery = `
 		p.description,
 		p.created_at,
 		p.updated_at
-	FROM rbac_permission p
-	JOIN rbac_role_permission rp ON rp.permission_id = p.id   
+	FROM guard_permission p
+	JOIN guard_role_permission rp ON rp.permission_id = p.id   
 	WHERE rp.role_id = ?
 `
 
@@ -431,7 +431,7 @@ const fetchRoleQuery = `
 		description,
 		created_at,	
 		updated_at
-	FROM rbac_role WHERE name = ?
+	FROM guard_role WHERE name = ?
 `
 
 // GetRole function will get the role entity by name
@@ -488,12 +488,13 @@ const fetchRolesResourceQuery = `
 	SELECT 
 		r.id,
 		r.name,
+		r.description,
 		r.created_at,
 		r.updated_at
-	FROM rbac_role r
-	JOIN rbac_role_permission rp ON rp.role_id = r.id
-	JOIN rbac_permission p ON p.id = rp.permission_id
-	JOIN rbac_user_role ur ON ur.role_id = r.id
+	FROM guard_role r
+	JOIN guard_role_permission rp ON rp.role_id = r.id
+	JOIN guard_permission p ON p.id = rp.permission_id
+	JOIN guard_user_role ur ON ur.role_id = r.id
 	WHERE ur.user_id = ? AND p.method = ?  AND p.route = ?
 `
 

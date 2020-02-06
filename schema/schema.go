@@ -11,7 +11,7 @@ type Schema struct {
 }
 
 type Entity struct {
-	DBContract DbContract
+	DBContract DbContract `json:"-"`
 }
 
 type existRecord struct {
@@ -44,6 +44,7 @@ func (s *Schema) User(userModel *User) *User {
 			Entity: Entity{DBContract: s.DbConnection},
 		}
 	}
+
 	userModel.DBContract = s.DbConnection
 	return userModel
 }

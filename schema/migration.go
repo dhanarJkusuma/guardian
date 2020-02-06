@@ -4,14 +4,14 @@ import (
 	"database/sql"
 )
 
-// MigrationSchema represents `rbac_migration` table in the database
+// MigrationSchema represents `guard_migration` table in the database
 type MigrationSchema struct {
 	Entity
 }
 
 const fetchMigrationQuery = `
 	SELECT EXISTS (
-		SELECT migration_key FROM rbac_migration WHERE migration_key = ? LIMIT 1
+		SELECT migration_key FROM guard_migration WHERE migration_key = ? LIMIT 1
 	) AS is_exist
 `
 
@@ -34,7 +34,7 @@ func (m *MigrationSchema) CheckExistingMigration(key string) (bool, error) {
 }
 
 const insertMigrationQuery = `
-	INSERT INTO rbac_migration(
+	INSERT INTO guard_migration(
 		migration_key
 	) VALUES (?)
 `
