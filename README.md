@@ -167,7 +167,7 @@ If you want to define some `rule`, you can add the rules constrain in the databa
 Then, create a `rule` function using RuleExecutor interface that need to implement `Name()` and `Execute(*schema.User, *rule.schema.Rule, r *http.Request)` function
 ```go
 type DashboardRule struct {
-	// could be contains database connection or something
+	// could contains database connection or something
 }
 
 func (d *DashboardRule) Name() string {
