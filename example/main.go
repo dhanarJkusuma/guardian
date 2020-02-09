@@ -17,9 +17,44 @@ import (
 	"github.com/dhanarJkusuma/guardian/schema"
 )
 
+const schemaGuardCfg = `
+{
+	"user": {
+		"username": {
+			"min": 6,
+			"max": 20,
+			"regex_validation": {
+				"regex": "^[a-zA-Z0-9_]*$",
+				"regex_err_msg": "your custom message"
+			}
+		},
+		"password": {
+			"min": 6,
+			"max": 12,
+			"regex_validation": {
+				"regex": "^[a-zA-Z0-9_]*$",
+				"regex_err_msg": "your custom message"
+			}
+		}
+	},
+	"rule": {
+		"min": 3,
+		"max": 10
+	},
+	"role": {
+		"min": 3,
+		"max": 10		
+	},
+	"permission": {
+		"min": 3,
+		"max": 10
+	}
+}
+`
+
 func main() {
 	// open db connection
-	dbConn := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&multiStatements=true", "root", "", "127.0.0.1", "guard_example")
+	dbConn := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&multiStatements=true", "root", "", "127.0.0.1", "guard_example_2")
 	db, err := sql.Open("mysql", dbConn)
 	if err != nil {
 		panic(err.Error())
@@ -35,14 +70,15 @@ func main() {
 	// init guardian
 	guard := guardian.NewGuardian(&guardian.Options{
 		DbConnection: db,
-		SchemaName:   "guard_example",
+		SchemaName:   "guard_example_2",
 		Session: guardian.SessionOptions{
 			CacheClient:      cacheClient,
 			LoginMethod:      auth.LoginEmail,
 			ExpiredInSeconds: int64(24 * time.Hour),
 			SessionName:      "_Guardian_Session_",
-		},
-	}).Build()
+		}}).
+		SetSchemaValidation(schemaGuardCfg).
+		Build()
 
 	// init db migration
 	err = guard.Migration.Initialize()

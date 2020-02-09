@@ -2,7 +2,6 @@ package migration
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/dhanarJkusuma/guardian/auth"
@@ -46,23 +45,23 @@ var requiredIndexes = map[string]bool{
 
 // Migration represent entity that has responsibility for schema migration
 type Migration struct {
-	schemaName   string
-	dbConnection *sql.DB
-	authModule   *auth.Auth
+	schemaName string
+	gSchema    *schema.Schema
+	authModule *auth.Auth
 }
 
 type MigrationOptions struct {
-	Schema       string
-	DBConnection *sql.DB
-	Auth         *auth.Auth
+	Schema      string
+	GuardSchema *schema.Schema
+	Auth        *auth.Auth
 }
 
 // NewMigration acts as constructor with required params
 func NewMigration(opts MigrationOptions) (*Migration, error) {
 	m := &Migration{
-		schemaName:   opts.Schema,
-		dbConnection: opts.DBConnection,
-		authModule:   opts.Auth,
+		schemaName: opts.Schema,
+		gSchema:    opts.GuardSchema,
+		authModule: opts.Auth,
 	}
 	return m, nil
 }
@@ -114,7 +113,7 @@ func (m *Migration) migrate(filename string) error {
 	}
 	// run migration version
 	ctx := context.Background()
-	_, err = m.dbConnection.ExecContext(ctx, query)
+	_, err = m.gSchema.DbConnection.ExecContext(ctx, query)
 	return err
 }
 
@@ -154,10 +153,13 @@ func (m *Migration) Down() {
 // Run function will run custom migration
 func (m *Migration) Run(name string, f func(ptx *GuardTx) error) error {
 	var err error
-	gtx := &GuardTx{Auth: m.authModule}
+	gtx := &GuardTx{
+		Auth:      m.authModule,
+		validator: m.gSchema.Validator,
+	}
 
 	// init begin transaction db
-	tx, err := m.dbConnection.Begin()
+	tx, err := m.gSchema.DbConnection.Begin()
 	gtx.dbTx = tx
 
 	defer func(err error) {
@@ -210,7 +212,7 @@ func (m *Migration) validateIndexes() error {
 	WHERE TABLE_SCHEMA = ? 
 	AND INDEX_NAME <> ?`
 
-	rows, err := m.dbConnection.Query(querySchema, m.schemaName, "PRIMARY")
+	rows, err := m.gSchema.DbConnection.Query(querySchema, m.schemaName, "PRIMARY")
 	if err != nil {
 		log.Println(err)
 		return errors.New(fmt.Sprintf(ErrMigration, "error while checking the tables"))

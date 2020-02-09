@@ -3,7 +3,12 @@ package schema
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
+)
+
+var (
+	RoleNotFound = errors.New("role is not exist")
 )
 
 // Role represents `guard_role` table in the database
@@ -16,13 +21,38 @@ type Role struct {
 
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
+
+	exist     bool           `json:"-"`
+	validator *RoleValidator `json:"-"`
+}
+
+// SetValidator is setter function to set validator in role entity
+func (r *Role) SetValidator(validator *RoleValidator) {
+	r.validator = validator
+}
+
+// Validate will validate all value in role entity
+func (r *Role) validate() error {
+	// validate name
+	return r.validator.Name.validateLen("name", r.Name)
+}
+
+// setDefaultTimeStamp is helper func to set current time for attribute `created_at` and `updated_at`
+func (r *Role) setDefaultTimeStamp() {
+	now := time.Now()
+	r.UpdatedAt = now
+	if !r.exist {
+		r.CreatedAt = now
+	}
 }
 
 const insertRoleQuery = `
 	INSERT INTO guard_role (
 		name, 
-		description
-	) VALUES (?,?)
+		description,
+		created_at,
+		updated_at
+	) VALUES (?, ?, ?, ?)
 `
 
 // CreateRole function will create a new record of role entity
@@ -30,16 +60,27 @@ func (r *Role) CreateRole() error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	err := r.validate()
+	if err != nil {
+		return err
+	}
+
+	r.setDefaultTimeStamp()
+
 	result, err := r.DBContract.Exec(
 		insertRoleQuery,
 		r.Name,
 		r.Description,
+		r.CreatedAt,
+		r.UpdatedAt,
 	)
 	if err != nil {
 		return err
 	}
 
 	r.ID, _ = result.LastInsertId()
+	r.exist = true
 	return nil
 }
 
@@ -48,25 +89,38 @@ func (r *Role) CreateRoleContext(ctx context.Context) error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	err := r.validate()
+	if err != nil {
+		return err
+	}
+
+	r.setDefaultTimeStamp()
+
 	result, err := r.DBContract.ExecContext(
 		ctx,
 		insertRoleQuery,
 		r.Name,
 		r.Description,
+		r.CreatedAt,
+		r.UpdatedAt,
 	)
 	if err != nil {
 		return err
 	}
 
 	r.ID, _ = result.LastInsertId()
+	r.exist = true
 	return nil
 }
 
 const saveRoleQuery = `
 	INSERT INTO guard_role (
 		name,
-		description
-	) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = ?, description = ?
+		description,
+		created_at,
+		updated_at
+	) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = ?, description = ?, updated_at = ?
 `
 
 // Save function will save updated role entity
@@ -77,16 +131,30 @@ func (r *Role) Save() error {
 		return ErrNoSchema
 	}
 
+	// validate data
+	err := r.validate()
+	if err != nil {
+		return err
+	}
+
+	r.setDefaultTimeStamp()
+
 	result, err := r.DBContract.Exec(
 		saveRoleQuery,
 		r.Name,
 		r.Description,
+		r.CreatedAt,
+		r.UpdatedAt,
+		r.Name,
+		r.Description,
+		r.UpdatedAt,
 	)
 	if err != nil {
 		return err
 	}
 
 	r.ID, _ = result.LastInsertId()
+	r.exist = true
 	return nil
 }
 
@@ -98,17 +166,30 @@ func (r *Role) SaveContext(ctx context.Context) error {
 		return ErrNoSchema
 	}
 
+	err := r.validate()
+	if err != nil {
+		return err
+	}
+
+	r.setDefaultTimeStamp()
+
 	result, err := r.DBContract.ExecContext(
 		ctx,
 		saveRoleQuery,
 		r.Name,
 		r.Description,
+		r.CreatedAt,
+		r.UpdatedAt,
+		r.Name,
+		r.Description,
+		r.UpdatedAt,
 	)
 	if err != nil {
 		return err
 	}
 
 	r.ID, _ = result.LastInsertId()
+	r.exist = true
 	return nil
 }
 
@@ -119,6 +200,10 @@ const deleteRoleQuery = `DELETE FROM guard_role WHERE id = ?`
 func (r *Role) Delete() error {
 	if r.DBContract == nil {
 		return ErrNoSchema
+	}
+
+	if !r.exist {
+		return RoleNotFound
 	}
 
 	if r.ID <= 0 {
@@ -140,9 +225,15 @@ func (r *Role) DeleteContext(ctx context.Context) error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !r.exist {
+		return RoleNotFound
+	}
+
 	if r.ID <= 0 {
 		return ErrInvalidID
 	}
+
 	_, err := r.DBContract.ExecContext(
 		ctx,
 		deleteRoleQuery,
@@ -167,6 +258,15 @@ func (r *Role) Assign(u *User) error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !r.exist {
+		return RoleNotFound
+	}
+
+	if !u.exist {
+		return UserNotFound
+	}
+
 	if r.ID <= 0 || u.ID <= 0 {
 		return ErrInvalidID
 	}
@@ -188,6 +288,15 @@ func (r *Role) AssignContext(ctx context.Context, u *User) error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !r.exist {
+		return RoleNotFound
+	}
+
+	if !u.exist {
+		return UserNotFound
+	}
+
 	if r.ID <= 0 || u.ID <= 0 {
 		return ErrInvalidID
 	}
@@ -212,6 +321,15 @@ func (r *Role) Revoke(u *User) error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !r.exist {
+		return RoleNotFound
+	}
+
+	if !u.exist {
+		return UserNotFound
+	}
+
 	if r.ID <= 0 || u.ID <= 0 {
 		return ErrInvalidID
 	}
@@ -234,6 +352,15 @@ func (r *Role) RevokeContext(ctx context.Context, u *User) error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !r.exist {
+		return RoleNotFound
+	}
+
+	if !u.exist {
+		return UserNotFound
+	}
+
 	if r.ID <= 0 || u.ID <= 0 {
 		return ErrInvalidID
 	}
@@ -264,6 +391,15 @@ func (r *Role) AddPermission(p *Permission) error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !r.exist {
+		return RoleNotFound
+	}
+
+	if !p.exist {
+		return PermissionNotFound
+	}
+
 	if r.ID <= 0 || p.ID <= 0 {
 		return ErrInvalidID
 	}
@@ -285,6 +421,19 @@ func (r *Role) AddPermissionContext(ctx context.Context, p *Permission) error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !r.exist {
+		return RoleNotFound
+	}
+
+	if !p.exist {
+		return PermissionNotFound
+	}
+
+	if r.ID <= 0 || p.ID <= 0 {
+		return ErrInvalidID
+	}
+
 	_, err := r.DBContract.ExecContext(
 		ctx,
 		addPermissionQuery,
@@ -305,6 +454,15 @@ func (r *Role) RemovePermission(p *Permission) error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !r.exist {
+		return RoleNotFound
+	}
+
+	if !p.exist {
+		return PermissionNotFound
+	}
+
 	if r.ID <= 0 || p.ID <= 0 {
 		return ErrInvalidID
 	}
@@ -326,6 +484,15 @@ func (r *Role) RemovePermissionContext(ctx context.Context, p *Permission) error
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !r.exist {
+		return RoleNotFound
+	}
+
+	if !p.exist {
+		return PermissionNotFound
+	}
+
 	if r.ID <= 0 || p.ID <= 0 {
 		return ErrInvalidID
 	}
@@ -385,6 +552,7 @@ func (r *Role) GetPermissions() ([]Permission, error) {
 			&permission.UpdatedAt,
 		)
 		if err == nil {
+			permission.exist = true
 			permissions = append(permissions, permission)
 		}
 	}
@@ -418,6 +586,7 @@ func (r *Role) GetPermissionsContext(ctx context.Context) ([]Permission, error) 
 			&permission.UpdatedAt,
 		)
 		if err == nil {
+			permission.exist = true
 			permissions = append(permissions, permission)
 		}
 	}
@@ -456,6 +625,7 @@ func (r *Role) GetRole(name string) (*Role, error) {
 		}
 		return nil, err
 	}
+	role.exist = true
 	return role, nil
 }
 
@@ -481,6 +651,7 @@ func (r *Role) GetRoleContext(ctx context.Context, name string) (*Role, error) {
 		}
 		return nil, err
 	}
+	role.exist = true
 	return role, nil
 }
 
@@ -509,6 +680,14 @@ func (r *Role) GetRolesResource(user *User, method, route string) ([]Role, error
 		return nil, ErrInvalidID
 	}
 
+	if !r.exist {
+		return nil, RoleNotFound
+	}
+
+	if !user.exist {
+		return nil, UserNotFound
+	}
+
 	var role Role
 	role.DBContract = r.DBContract
 	roles := make([]Role, 0)
@@ -530,6 +709,7 @@ func (r *Role) GetRolesResource(user *User, method, route string) ([]Role, error
 		if err != nil {
 			return nil, err
 		}
+		role.exist = true
 		roles = append(roles, role)
 	}
 
@@ -545,6 +725,14 @@ func (r *Role) GetRolesResourceContext(ctx context.Context, user *User, method, 
 
 	if user == nil || user.ID <= 0 {
 		return nil, ErrInvalidID
+	}
+
+	if !r.exist {
+		return nil, RoleNotFound
+	}
+
+	if !user.exist {
+		return nil, UserNotFound
 	}
 
 	var role Role
@@ -574,6 +762,7 @@ func (r *Role) GetRolesResourceContext(ctx context.Context, user *User, method, 
 		if err != nil {
 			return nil, err
 		}
+		role.exist = true
 		roles = append(roles, role)
 	}
 

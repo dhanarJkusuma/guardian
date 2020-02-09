@@ -3,8 +3,13 @@ package schema
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
+)
+
+var (
+	UserNotFound = errors.New("user is not exist")
 )
 
 // User represents `guard_user` table in the database
@@ -19,14 +24,76 @@ type User struct {
 
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
+
+	exist             bool           `json:"-"`
+	passwordEncrypted bool           `json:"-"`
+	validator         *UserValidator `json:"-"`
+}
+
+// setDefaultTimeStamp is helper func to set current time for attribute `created_at` and `updated_at`
+func (u *User) setDefaultTimeStamp() {
+	now := time.Now()
+	u.UpdatedAt = now
+	if !u.exist {
+		u.CreatedAt = now
+	}
+}
+
+// SetValidator is setter function to set validator in user entity
+func (u *User) SetValidator(validator *UserValidator) {
+	u.validator = validator
+}
+
+// SetEncryptedPassword will set passwordEncrypted password and updating flag as passwordEncrypted
+func (u *User) SetEncryptedPassword(encrypted string) {
+	u.Password = encrypted
+	u.passwordEncrypted = true
+}
+
+// Validate will validate all value in user entity
+func (u *User) Validate() error {
+	// username length
+	err := u.validator.Username.validateLen("username", u.Username)
+	if err != nil {
+		return err
+	}
+
+	// username regex
+	err = u.validator.Username.validateLen("username", u.Username)
+	if err != nil {
+		return err
+	}
+
+	// email regex
+	err = u.validator.Email.validateRegex("email", u.Email)
+	if err != nil {
+		return err
+	}
+
+	// password length
+	if !u.passwordEncrypted {
+		err = u.validator.Password.StringValidator.validateLen("password", u.Password)
+		if err != nil {
+			return err
+		}
+
+		err = u.validator.Password.Regex.validateRegex("password", u.Password)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 const insertUserQuery = `
 	INSERT INTO guard_user (
 		email,
 		username,
-		password
-	) VALUES (?,?,?)
+		password,
+		created_at,
+		updated_at
+	) VALUES (?,?,?,?,?)
 `
 
 // CreateUser function will create a new record of user entity
@@ -34,11 +101,20 @@ func (u *User) CreateUser() error {
 	if u.DBContract == nil {
 		return ErrNoSchema
 	}
+	err := u.Validate()
+	if err != nil {
+		return err
+	}
+
+	u.setDefaultTimeStamp()
+
 	result, err := u.DBContract.Exec(
 		insertUserQuery,
 		u.Email,
 		u.Username,
 		u.Password,
+		u.CreatedAt,
+		u.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -46,6 +122,7 @@ func (u *User) CreateUser() error {
 
 	u.ID, err = result.LastInsertId()
 	u.Active = true
+	u.exist = true
 	return nil
 }
 
@@ -54,6 +131,12 @@ func (u *User) CreateUserContext(ctx context.Context) error {
 	if u.DBContract == nil {
 		return ErrNoSchema
 	}
+	err := u.Validate()
+	if err != nil {
+		return err
+	}
+
+	u.setDefaultTimeStamp()
 
 	result, err := u.DBContract.ExecContext(
 		ctx,
@@ -61,6 +144,8 @@ func (u *User) CreateUserContext(ctx context.Context) error {
 		u.Email,
 		u.Username,
 		u.Password,
+		u.CreatedAt,
+		u.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -68,6 +153,7 @@ func (u *User) CreateUserContext(ctx context.Context) error {
 
 	u.ID, err = result.LastInsertId()
 	u.Active = true
+	u.exist = true
 	return nil
 }
 
@@ -76,8 +162,10 @@ const saveUserQuery = `
 		email,
 		username,
 		password,
-		active
-	) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE email = ?, username = ?, password = ?, active = ?
+		active,
+		created_at,
+		updated_at
+	) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE email = ?, username = ?, password = ?, active = ?, updated_at = ?
 `
 
 // Save function will save updated user entity
@@ -88,22 +176,35 @@ func (u *User) Save() error {
 		return ErrNoSchema
 	}
 
+	// validate
+	err := u.Validate()
+	if err != nil {
+		return err
+	}
+
+	// set the timestamp is user is not exist
+	u.setDefaultTimeStamp()
+
 	result, err := u.DBContract.Exec(
 		saveUserQuery,
 		u.Email,
 		u.Username,
 		u.Password,
 		u.Active,
+		u.CreatedAt,
+		u.UpdatedAt,
 		u.Email,
 		u.Username,
 		u.Password,
 		u.Active,
+		u.UpdatedAt,
 	)
 	if err != nil {
 		return err
 	}
 
 	u.ID, _ = result.LastInsertId()
+	u.exist = true
 	return nil
 }
 
@@ -114,6 +215,16 @@ func (u *User) SaveContext(ctx context.Context) error {
 	if u.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	// validate
+	err := u.Validate()
+	if err != nil {
+		return err
+	}
+
+	// set the timestamp is user is not exist
+	u.setDefaultTimeStamp()
+
 	result, err := u.DBContract.ExecContext(
 		ctx,
 		saveUserQuery,
@@ -121,16 +232,20 @@ func (u *User) SaveContext(ctx context.Context) error {
 		u.Username,
 		u.Password,
 		u.Active,
+		u.CreatedAt,
+		u.UpdatedAt,
 		u.Email,
 		u.Username,
 		u.Password,
 		u.Active,
+		u.UpdatedAt,
 	)
 	if err != nil {
 		return err
 	}
 
 	u.ID, _ = result.LastInsertId()
+	u.exist = true
 	return nil
 }
 
@@ -141,6 +256,10 @@ const deleteUserQuery = `DELETE FROM guard_user WHERE id = ?`
 func (u *User) Delete() error {
 	if u.DBContract == nil {
 		return ErrNoSchema
+	}
+
+	if !u.exist {
+		return UserNotFound
 	}
 
 	if u.ID <= 0 {
@@ -162,6 +281,10 @@ func (u *User) Delete() error {
 func (u *User) DeleteContext(ctx context.Context) error {
 	if u.DBContract == nil {
 		return ErrNoSchema
+	}
+
+	if !u.exist {
+		return UserNotFound
 	}
 
 	if u.ID <= 0 {
@@ -197,6 +320,10 @@ func (u *User) CanAccess(method, path string) (bool, error) {
 		return false, ErrNoSchema
 	}
 
+	if !u.exist {
+		return false, UserNotFound
+	}
+
 	var accessRecord existRecord
 	result := u.DBContract.QueryRow(getAccessQuery, u.ID, method, path)
 	err := result.Scan(&accessRecord.IsExist)
@@ -211,6 +338,10 @@ func (u *User) CanAccess(method, path string) (bool, error) {
 func (u *User) CanAccessContext(ctx context.Context, method, path string) (bool, error) {
 	if u.DBContract == nil {
 		return false, ErrNoSchema
+	}
+
+	if !u.exist {
+		return false, UserNotFound
 	}
 
 	var accessRecord existRecord
@@ -241,6 +372,10 @@ func (u *User) HasPermission(permissionName string) (bool, error) {
 		return false, ErrNoSchema
 	}
 
+	if !u.exist {
+		return false, UserNotFound
+	}
+
 	var permissionRecord existRecord
 	result := u.DBContract.QueryRow(getUserPermissionQuery, u.ID, permissionName)
 	err := result.Scan(&permissionRecord.IsExist)
@@ -255,6 +390,10 @@ func (u *User) HasPermission(permissionName string) (bool, error) {
 func (u *User) HasPermissionContext(ctx context.Context, permissionName string) (bool, error) {
 	if u.DBContract == nil {
 		return false, ErrNoSchema
+	}
+
+	if !u.exist {
+		return false, UserNotFound
 	}
 
 	var permissionRecord existRecord
@@ -283,6 +422,10 @@ func (u *User) HasRole(roleName string) (bool, error) {
 		return false, ErrNoSchema
 	}
 
+	if !u.exist {
+		return false, UserNotFound
+	}
+
 	var roleRecord existRecord
 	result := u.DBContract.QueryRow(getUserRoleQuery, u.ID, roleName)
 	err := result.Scan(&roleRecord.IsExist)
@@ -292,12 +435,17 @@ func (u *User) HasRole(roleName string) (bool, error) {
 	return roleRecord.IsExist, nil
 }
 
-// HasRoleContext function will return bool that represent this user has specific roleName or not
+// HasRoleContext function wi	ll return bool that represent this user has specific roleName or not
 // This function will check the user role record by user, roleName and context
 func (u *User) HasRoleContext(ctx context.Context, roleName string) (bool, error) {
 	if u.DBContract == nil {
 		return false, ErrNoSchema
 	}
+
+	if !u.exist {
+		return false, UserNotFound
+	}
+
 	var roleRecord existRecord
 	result := u.DBContract.QueryRowContext(ctx, getUserRoleQuery, u.ID, roleName)
 	err := result.Scan(&roleRecord.IsExist)
@@ -325,6 +473,11 @@ func (u *User) GetRoles() ([]Role, error) {
 	if u.DBContract == nil {
 		return nil, ErrNoSchema
 	}
+
+	if !u.exist {
+		return nil, UserNotFound
+	}
+
 	var roles []Role
 
 	roles = make([]Role, 0)
@@ -339,8 +492,16 @@ func (u *User) GetRoles() ([]Role, error) {
 	var role Role
 	role.DBContract = u.DBContract
 	for result.Next() {
-		err = result.Scan(&role.ID, &role.Name, &role.Description, &role.Description, &role.CreatedAt, &role.UpdatedAt)
+		err = result.Scan(
+			&role.ID,
+			&role.Name,
+			&role.Description,
+			&role.Description,
+			&role.CreatedAt,
+			&role.UpdatedAt,
+		)
 		if err == nil {
+			role.exist = true
 			roles = append(roles, role)
 		}
 		return nil, err
@@ -354,6 +515,11 @@ func (u *User) GetRolesContext(ctx context.Context) ([]Role, error) {
 	if u.DBContract == nil {
 		return nil, ErrNoSchema
 	}
+
+	if !u.exist {
+		return nil, UserNotFound
+	}
+
 	var roles []Role
 
 	roles = make([]Role, 0)
@@ -369,6 +535,7 @@ func (u *User) GetRolesContext(ctx context.Context) ([]Role, error) {
 	for result.Next() {
 		err = result.Scan(&role)
 		if err == nil {
+			role.exist = true
 			roles = append(roles, role)
 		}
 	}
@@ -397,6 +564,10 @@ func (u *User) GetPermissions() ([]Permission, error) {
 		return nil, ErrNoSchema
 	}
 
+	if !u.exist {
+		return nil, UserNotFound
+	}
+
 	permissions := make([]Permission, 0)
 	result, err := u.DBContract.Query(getUserPermissionsQuery, u.ID)
 	if err != nil {
@@ -420,6 +591,7 @@ func (u *User) GetPermissions() ([]Permission, error) {
 			&permission.UpdatedAt,
 		)
 		if err == nil {
+			permission.exist = true
 			permissions = append(permissions, permission)
 		}
 		return nil, err
@@ -432,6 +604,10 @@ func (u *User) GetPermissions() ([]Permission, error) {
 func (u *User) GetPermissionsContext(ctx context.Context) ([]Permission, error) {
 	if u.DBContract == nil {
 		return nil, ErrNoSchema
+	}
+
+	if !u.exist {
+		return nil, UserNotFound
 	}
 
 	permissions := make([]Permission, 0)
@@ -457,6 +633,7 @@ func (u *User) GetPermissionsContext(ctx context.Context) ([]Permission, error) 
 			&permission.UpdatedAt,
 		)
 		if err == nil {
+			permission.exist = true
 			permissions = append(permissions, permission)
 		}
 		return nil, err
@@ -503,6 +680,7 @@ func (u *User) FindUserByUsernameOrEmail(params string) (*User, error) {
 		return nil, err
 	}
 	user.DBContract = u.DBContract
+	user.exist = true
 	return user, nil
 }
 
@@ -531,6 +709,7 @@ func (u *User) FindUserByUsernameOrEmailContext(ctx context.Context, params stri
 		return nil, err
 	}
 	user.DBContract = u.DBContract
+	user.exist = true
 	return user, nil
 }
 
@@ -589,6 +768,7 @@ func (u *User) FindUser(params map[string]interface{}) (*User, error) {
 		return nil, err
 	}
 	user.DBContract = u.DBContract
+	user.exist = true
 	return user, nil
 }
 
@@ -635,5 +815,6 @@ func (u *User) FindUserContext(ctx context.Context, params map[string]interface{
 		return nil, err
 	}
 	user.DBContract = u.DBContract
+	user.exist = true
 	return user, nil
 }

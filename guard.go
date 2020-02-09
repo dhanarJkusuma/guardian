@@ -2,6 +2,8 @@ package guardian
 
 import (
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"github.com/dhanarJkusuma/guardian/auth"
 	"github.com/dhanarJkusuma/guardian/auth/password"
 	"github.com/dhanarJkusuma/guardian/auth/token"
@@ -35,6 +37,7 @@ type guardianBuilder struct {
 	guardOpts        *Options
 	tokenStrategy    token.TokenGenerator
 	passwordStrategy password.PasswordGenerator
+	validation       string
 }
 
 // NewGuardian will set required parameters and return guardianBuilder
@@ -62,10 +65,31 @@ func (p *guardianBuilder) SetPasswordGenerator(generator password.PasswordGenera
 	return p
 }
 
+func (p *guardianBuilder) SetSchemaValidation(config string) *guardianBuilder {
+	p.validation = config
+	return p
+}
+
 // Build() will set all required parameters
 func (p *guardianBuilder) Build() *Guardian {
+	var validator *schema.Validator
+
+	// check schema validation
+	if len(p.validation) > 0 {
+		err := json.Unmarshal([]byte(p.validation), &validator)
+		if err != nil {
+			panic(errors.New("error occur while parsing validator config"))
+		}
+	} else {
+		validator = &schema.Validator{}
+	}
+
+	validator.Initialize()
 	rbac := &Guardian{
-		guardSchema: &schema.Schema{DbConnection: p.guardOpts.DbConnection},
+		guardSchema: &schema.Schema{
+			DbConnection: p.guardOpts.DbConnection,
+			Validator:    validator,
+		},
 	}
 
 	// initialize auth module
@@ -83,9 +107,9 @@ func (p *guardianBuilder) Build() *Guardian {
 
 	// initialize migration module
 	migrationModule, err := migration.NewMigration(migration.MigrationOptions{
-		Schema:       p.guardOpts.SchemaName,
-		DBConnection: p.guardOpts.DbConnection,
-		Auth:         authModule,
+		Schema:      p.guardOpts.SchemaName,
+		GuardSchema: rbac.guardSchema,
+		Auth:        authModule,
 	})
 	if err != nil {
 		panic(err)

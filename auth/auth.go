@@ -239,7 +239,13 @@ func (a *Auth) Register(user *schema.User) error {
 	if user.DBContract == nil {
 		user = a.dbSchema.User(user)
 	}
-	user.Password = a.passwordStrategy.HashPassword(user.Password)
+
+	err := user.Validate()
+	if err != nil {
+		return err
+	}
+
+	user.SetEncryptedPassword(a.passwordStrategy.HashPassword(user.Password))
 	return user.CreateUser()
 }
 

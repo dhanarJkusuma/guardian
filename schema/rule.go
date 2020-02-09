@@ -3,6 +3,7 @@ package schema
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -19,6 +20,10 @@ var EnumRuleTypes = RuleTypes{
 	PermissionRuleType: 9,
 }
 
+var (
+	RuleNotFound = errors.New("rule is not exist")
+)
+
 // Role represents `guard_rule` table in the database
 type Rule struct {
 	Entity
@@ -30,6 +35,9 @@ type Rule struct {
 
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
+
+	exist     bool
+	validator *RuleValidator `json:"-"`
 }
 
 // RuleExecutor represent rule behaviour which acts as additional constraint to roles and permission
@@ -38,12 +46,34 @@ type RuleExecutor interface {
 	Execute(user *User, rule *Rule, r *http.Request) bool
 }
 
+// SetValidator is setter function to set validator in rule entity
+func (r *Rule) SetValidator(validator *RuleValidator) {
+	r.validator = validator
+}
+
+// Validate will validate all value in rule entity
+func (r *Rule) validate() error {
+	// validate name
+	return r.validator.Name.validateLen("name", r.Name)
+}
+
+// setDefaultTimeStamp is helper func to set current time for attribute `created_at` and `updated_at`
+func (r *Rule) setDefaultTimeStamp() {
+	now := time.Now()
+	r.UpdatedAt = now
+	if !r.exist {
+		r.CreatedAt = now
+	}
+}
+
 const insertRuleQuery = `
 	INSERT INTO guard_role (
 		rule_type,
 		parent_id,
-		name
-	) VALUES (?,?,?)
+		name,
+		created_at,
+		updated_at
+	) VALUES (?,?,?,?,?)
 `
 
 // CreateRule function will create a new record of rule entity
@@ -51,17 +81,29 @@ func (r *Rule) CreateRule() error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	// validate data
+	err := r.validate()
+	if err != nil {
+		return err
+	}
+
+	r.setDefaultTimeStamp()
+
 	result, err := r.DBContract.Exec(
 		insertRuleQuery,
 		r.RuleType,
 		r.ParentID,
 		r.Name,
+		r.CreatedAt,
+		r.UpdatedAt,
 	)
 	if err != nil {
 		return err
 	}
 
 	r.ID, _ = result.LastInsertId()
+	r.exist = true
 	return nil
 }
 
@@ -70,6 +112,15 @@ func (r *Rule) CreateRuleContext(ctx context.Context) error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	// validate data
+	err := r.validate()
+	if err != nil {
+		return err
+	}
+
+	r.setDefaultTimeStamp()
+
 	result, err := r.DBContract.ExecContext(
 		ctx,
 		insertRuleQuery,
@@ -82,6 +133,7 @@ func (r *Rule) CreateRuleContext(ctx context.Context) error {
 	}
 
 	r.ID, _ = result.LastInsertId()
+	r.exist = true
 	return nil
 }
 
@@ -89,8 +141,10 @@ const saveRuleQuery = `
 	INSERT INTO guard_rule (
 		rule_type,
 		parent_id,
-		name
-	) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE rule_type = ?, parent_id = ?, name = ?
+		name,
+		created_at,
+		updated_at
+	) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE rule_type = ?, parent_id = ?, name = ?, updated_at = ?
 `
 
 // Save function will save updated rule entity
@@ -101,20 +155,32 @@ func (r *Rule) Save() error {
 		return ErrNoSchema
 	}
 
+	// validate data
+	err := r.validate()
+	if err != nil {
+		return err
+	}
+
+	r.setDefaultTimeStamp()
+
 	result, err := r.DBContract.Exec(
 		saveRuleQuery,
 		r.RuleType,
 		r.ParentID,
 		r.Name,
+		r.CreatedAt,
+		r.UpdatedAt,
 		r.RuleType,
 		r.ParentID,
 		r.Name,
+		r.UpdatedAt,
 	)
 	if err != nil {
 		return err
 	}
 
 	r.ID, _ = result.LastInsertId()
+	r.exist = true
 	return nil
 }
 
@@ -126,18 +192,33 @@ func (r *Rule) SaveContext(ctx context.Context) error {
 		return ErrNoSchema
 	}
 
+	// validate data
+	err := r.validate()
+	if err != nil {
+		return err
+	}
+
+	r.setDefaultTimeStamp()
+
 	result, err := r.DBContract.ExecContext(
 		ctx,
 		saveRuleQuery,
 		r.RuleType,
 		r.ParentID,
 		r.Name,
+		r.CreatedAt,
+		r.UpdatedAt,
+		r.RuleType,
+		r.ParentID,
+		r.Name,
+		r.UpdatedAt,
 	)
 	if err != nil {
 		return err
 	}
 
 	r.ID, _ = result.LastInsertId()
+	r.exist = true
 	return nil
 }
 
@@ -148,6 +229,10 @@ const deleteRuleQuery = `DELETE FROM guard_rule WHERE id = ?`
 func (r *Rule) Delete() error {
 	if r.DBContract == nil {
 		return ErrNoSchema
+	}
+
+	if !r.exist {
+		return RuleNotFound
 	}
 
 	if r.ID <= 0 {
@@ -169,6 +254,11 @@ func (r *Rule) DeleteContext(ctx context.Context) error {
 	if r.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !r.exist {
+		return RuleNotFound
+	}
+
 	if r.ID <= 0 {
 		return ErrInvalidID
 	}
@@ -217,6 +307,7 @@ func (r *Rule) GetRule(name string) (*Rule, error) {
 		}
 		return nil, err
 	}
+	rule.exist = true
 	return rule, nil
 }
 
@@ -243,6 +334,7 @@ func (r *Rule) GetRuleContext(ctx context.Context, name string) (*Rule, error) {
 		}
 		return nil, err
 	}
+	rule.exist = true
 	return rule, nil
 }
 
@@ -267,7 +359,9 @@ func (r *Rule) GetRolesRule(roles []Role) ([]Rule, error) {
 	args := make([]interface{}, len(roles))
 	args[0] = EnumRuleTypes.RoleRuleType
 	for i := range roles {
-		args = append(args, roles[i].ID)
+		if roles[i].exist {
+			args = append(args, roles[i].ID)
+		}
 	}
 	inStmt := `(?` + strings.Repeat(",?", len(roles)-1) + `)`
 	query := strings.Replace(fetchRuleByRuleTypeAndParentIDs, `(?)`, inStmt, -1)
@@ -295,6 +389,7 @@ func (r *Rule) GetRolesRule(roles []Role) ([]Rule, error) {
 		if err != nil {
 			return nil, err
 		}
+		rule.exist = true
 		rules = append(rules, rule)
 	}
 	return rules, nil
@@ -309,7 +404,9 @@ func (r *Rule) GetRolesRuleContext(ctx context.Context, roles []Role) ([]Rule, e
 	args := make([]interface{}, len(roles))
 	args[0] = EnumRuleTypes.RoleRuleType
 	for i := range roles {
-		args = append(args, roles[i].ID)
+		if roles[i].exist {
+			args = append(args, roles[i].ID)
+		}
 	}
 	inStmt := `(?` + strings.Repeat(",?", len(args)-1) + `)`
 	query := strings.Replace(fetchRuleByRuleTypeAndParentIDs, `(?)`, inStmt, -1)
@@ -337,6 +434,7 @@ func (r *Rule) GetRolesRuleContext(ctx context.Context, roles []Role) ([]Rule, e
 		if err != nil {
 			return nil, err
 		}
+		rule.exist = true
 		rules = append(rules, rule)
 	}
 	return rules, nil
@@ -359,6 +457,11 @@ func (r *Rule) GetPermissionRule(permission Permission) ([]Rule, error) {
 	if r.DBContract == nil {
 		return nil, ErrNoSchema
 	}
+
+	if !permission.exist {
+		return nil, PermissionNotFound
+	}
+
 	if permission.ID <= 0 {
 		return nil, ErrInvalidID
 	}
@@ -386,6 +489,7 @@ func (r *Rule) GetPermissionRule(permission Permission) ([]Rule, error) {
 		if err != nil {
 			return nil, err
 		}
+		rule.exist = true
 		rules = append(rules, rule)
 	}
 	return rules, nil
@@ -396,6 +500,11 @@ func (r *Rule) GetPermissionRuleContext(ctx context.Context, permission Permissi
 	if r.DBContract == nil {
 		return nil, ErrNoSchema
 	}
+
+	if !permission.exist {
+		return nil, PermissionNotFound
+	}
+
 	if permission.ID <= 0 {
 		return nil, ErrInvalidID
 	}
@@ -423,6 +532,7 @@ func (r *Rule) GetPermissionRuleContext(ctx context.Context, permission Permissi
 		if err != nil {
 			return nil, err
 		}
+		rule.exist = true
 		rules = append(rules, rule)
 	}
 	return rules, nil

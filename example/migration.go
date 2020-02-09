@@ -11,17 +11,19 @@ import (
 func InitAdminMigration(g *migration.GuardTx) error {
 	var errMig error
 
-	// create migration create user
+	// create user
 	adminUser := &schema.User{
 		Username: "administrator",
 		Email:    "administrator@guardian.com",
 		Password: "himitsu",
 	}
+	adminUser = g.User(adminUser)
 	errMig = g.Auth.Register(adminUser)
 	if errMig != nil {
 		return errMig
 	}
 
+	// create new permission
 	secretRoute := &schema.Permission{
 		Name:        "rahasia_1",
 		Method:      http.MethodGet,

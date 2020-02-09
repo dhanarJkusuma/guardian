@@ -3,7 +3,12 @@ package schema
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
+)
+
+var (
+	PermissionNotFound = errors.New("permission is not exist")
 )
 
 // Permission represents `guard_permission` table in the database
@@ -18,6 +23,20 @@ type Permission struct {
 
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
+
+	exist     bool                 `json:"-"`
+	validator *PermissionValidator `json:"-"`
+}
+
+// SetValidator is setter function to set validator in permission entity
+func (p *Permission) SetValidator(validator *PermissionValidator) {
+	p.validator = validator
+}
+
+// Validate will validate all value in permission entity
+func (p *Permission) validate() error {
+	// validate name
+	return p.validator.Name.validateLen("name", p.Name)
 }
 
 const insertPermissionQuery = `
@@ -34,6 +53,13 @@ func (p *Permission) CreatePermission() error {
 	if p.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	// validate
+	err := p.validate()
+	if err != nil {
+		return err
+	}
+
 	result, err := p.DBContract.Exec(
 		insertPermissionQuery,
 		p.Name,
@@ -45,6 +71,7 @@ func (p *Permission) CreatePermission() error {
 		return err
 	}
 	p.ID, _ = result.LastInsertId()
+	p.exist = true
 	return nil
 }
 
@@ -53,6 +80,13 @@ func (p *Permission) CreatePermissionContext(ctx context.Context) error {
 	if p.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	// validate
+	err := p.validate()
+	if err != nil {
+		return err
+	}
+
 	result, err := p.DBContract.ExecContext(
 		ctx,
 		insertPermissionQuery,
@@ -66,6 +100,7 @@ func (p *Permission) CreatePermissionContext(ctx context.Context) error {
 	}
 
 	p.ID, _ = result.LastInsertId()
+	p.exist = true
 	return nil
 }
 
@@ -87,6 +122,12 @@ func (p *Permission) Save() error {
 		return ErrNoSchema
 	}
 
+	// validate
+	err := p.validate()
+	if err != nil {
+		return err
+	}
+
 	result, err := p.DBContract.Exec(
 		savePermissionQuery,
 		p.Name,
@@ -103,6 +144,7 @@ func (p *Permission) Save() error {
 	}
 
 	p.ID, _ = result.LastInsertId()
+	p.exist = true
 	return nil
 }
 
@@ -112,6 +154,12 @@ func (p *Permission) Save() error {
 func (p *Permission) SaveContext(ctx context.Context) error {
 	if p.DBContract == nil {
 		return ErrNoSchema
+	}
+
+	// validate
+	err := p.validate()
+	if err != nil {
+		return err
 	}
 
 	result, err := p.DBContract.ExecContext(
@@ -131,6 +179,7 @@ func (p *Permission) SaveContext(ctx context.Context) error {
 	}
 
 	p.ID, _ = result.LastInsertId()
+	p.exist = true
 	return nil
 }
 
@@ -142,6 +191,11 @@ func (p *Permission) Delete() error {
 	if p.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !p.exist {
+		return PermissionNotFound
+	}
+
 	if p.ID <= 0 {
 		return ErrInvalidID
 	}
@@ -153,6 +207,7 @@ func (p *Permission) Delete() error {
 	if err != nil {
 		return err
 	}
+	p.exist = false
 	return nil
 }
 
@@ -162,6 +217,11 @@ func (p *Permission) DeleteContext(ctx context.Context) error {
 	if p.DBContract == nil {
 		return ErrNoSchema
 	}
+
+	if !p.exist {
+		return PermissionNotFound
+	}
+
 	if p.ID <= 0 {
 		return ErrInvalidID
 	}
@@ -174,6 +234,7 @@ func (p *Permission) DeleteContext(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	p.exist = false
 	return nil
 }
 
@@ -214,6 +275,7 @@ func (p *Permission) GetPermission(name string) (*Permission, error) {
 		return nil, err
 	}
 	permission.DBContract = p.DBContract
+	permission.exist = true
 	return permission, nil
 }
 
@@ -242,6 +304,7 @@ func (p *Permission) GetPermissionContext(ctx context.Context, name string) (*Pe
 		return nil, err
 	}
 	permission.DBContract = p.DBContract
+	permission.exist = true
 	return permission, nil
 }
 
@@ -282,6 +345,7 @@ func (p *Permission) GetPermissionByResource(method, path string) (*Permission, 
 		return nil, err
 	}
 	permission.DBContract = p.DBContract
+	permission.exist = true
 	return permission, nil
 }
 
@@ -310,5 +374,6 @@ func (p *Permission) GetPermissionByResourceContext(ctx context.Context, method,
 		return nil, err
 	}
 	permission.DBContract = p.DBContract
+	permission.exist = true
 	return permission, nil
 }

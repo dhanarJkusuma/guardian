@@ -8,29 +8,34 @@ import (
 
 // GuardTx is used for custom schema migration
 type GuardTx struct {
-	dbTx *sql.Tx
-	Auth *auth.Auth
+	dbTx      *sql.Tx
+	Auth      *auth.Auth
+	validator *schema.Validator
 }
 
 // User will inject the databaseTx in the `User` schema
 func (gtx *GuardTx) User(user *schema.User) *schema.User {
 	if user == nil {
-		return &schema.User{
+		user = &schema.User{
 			Entity: schema.Entity{DBContract: gtx.dbTx},
 		}
+	} else {
+		user.DBContract = gtx.dbTx
 	}
-	user.DBContract = gtx.dbTx
+	user.SetValidator(gtx.validator.User)
 	return user
 }
 
 // Role will inject the databaseTx in the `Role` schema
 func (gtx *GuardTx) Role(role *schema.Role) *schema.Role {
 	if role == nil {
-		return &schema.Role{
+		role = &schema.Role{
 			Entity: schema.Entity{DBContract: gtx.dbTx},
 		}
+	} else {
+		role.DBContract = gtx.dbTx
 	}
-	role.DBContract = gtx.dbTx
+	role.SetValidator(gtx.validator.Role)
 	return role
 }
 
@@ -40,8 +45,10 @@ func (gtx *GuardTx) Permission(permission *schema.Permission) *schema.Permission
 		return &schema.Permission{
 			Entity: schema.Entity{DBContract: gtx.dbTx},
 		}
+	} else {
+		permission.DBContract = gtx.dbTx
 	}
-	permission.DBContract = gtx.dbTx
+	permission.SetValidator(gtx.validator.Permission)
 	return permission
 }
 
@@ -53,6 +60,7 @@ func (gtx *GuardTx) Rule(rule *schema.Rule) *schema.Rule {
 		}
 	}
 	rule.DBContract = gtx.dbTx
+	rule.SetValidator(gtx.validator.Rule)
 	return rule
 }
 

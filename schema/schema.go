@@ -8,6 +8,7 @@ import (
 
 type Schema struct {
 	DbConnection *sql.DB
+	Validator    *Validator
 }
 
 type Entity struct {
@@ -41,11 +42,13 @@ type DbContract interface {
 func (s *Schema) User(userModel *User) *User {
 	if userModel == nil {
 		return &User{
-			Entity: Entity{DBContract: s.DbConnection},
+			Entity:    Entity{DBContract: s.DbConnection},
+			validator: s.Validator.User,
 		}
 	}
 
 	userModel.DBContract = s.DbConnection
+	userModel.validator = s.Validator.User
 	return userModel
 }
 
@@ -54,10 +57,12 @@ func (s *Schema) User(userModel *User) *User {
 func (s *Schema) Permission(permissionModel *Permission) *Permission {
 	if permissionModel == nil {
 		return &Permission{
-			Entity: Entity{DBContract: s.DbConnection},
+			Entity:    Entity{DBContract: s.DbConnection},
+			validator: s.Validator.Permission,
 		}
 	}
 	permissionModel.DBContract = s.DbConnection
+	permissionModel.validator = s.Validator.Permission
 	return permissionModel
 }
 
@@ -66,10 +71,12 @@ func (s *Schema) Permission(permissionModel *Permission) *Permission {
 func (s *Schema) Role(roleModel *Role) *Role {
 	if roleModel == nil {
 		return &Role{
-			Entity: Entity{DBContract: s.DbConnection},
+			Entity:    Entity{DBContract: s.DbConnection},
+			validator: s.Validator.Role,
 		}
 	}
 	roleModel.DBContract = s.DbConnection
+	roleModel.validator = s.Validator.Role
 	return roleModel
 }
 
@@ -78,9 +85,11 @@ func (s *Schema) Role(roleModel *Role) *Role {
 func (s *Schema) Rule(ruleModel *Rule) *Rule {
 	if ruleModel == nil {
 		return &Rule{
-			Entity: Entity{DBContract: s.DbConnection},
+			Entity:    Entity{DBContract: s.DbConnection},
+			validator: s.Validator.Rule,
 		}
 	}
 	ruleModel.DBContract = s.DbConnection
+	ruleModel.validator = s.Validator.Rule
 	return ruleModel
 }
